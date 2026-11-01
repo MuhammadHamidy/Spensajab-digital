@@ -1,0 +1,10 @@
+./applications.go
+./auth.go
+./check.go
+./client.go
+./notifications.go
+./provider.go
+./refresh.go
+./roles.go
+./user_roles.go
+./users.go

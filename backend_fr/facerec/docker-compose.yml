@@ -1,0 +1,115 @@
+services:
+  migrate:
+    image: migrate/migrate
+    container_name: presdig-migrate
+    volumes:
+      - ./migrations:/migrations
+    command: -path=/migrations -database 'postgres://user:pass@postgres:5432/presdig?sslmode=disable' up
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  seeder:
+    image: postgres:15-alpine
+    container_name: presdig-seeder
+    volumes:
+      - ./seeders:/seeders
+    environment:
+      PGPASSWORD: pass
+    command: >
+      sh -c "for f in /seeders/*.sql; do psql -h postgres -U user -d presdig -f \"$$f\"; done"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  presdig-be:
+    build:
+      context: ..
+      dockerfile: facerec/Dockerfile
+      target: dev
+    container_name: presdig-be
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../framework:/app/framework
+      - ../libraries:/app/libraries
+      - .:/app/facerec
+      - ../go.work:/app/go.work
+    environment:
+      APP_NAME: presdig
+      APP_ENV: local
+      APP_PORT: 8080
+      APP_POSTGRES_URL: "postgres://user:pass@postgres:5432/presdig?sslmode=disable"
+      APP_REDIS_ADDRESS: "redis:6379"
+      APP_REDIS_PASSWORD: ""
+      APP_REDIS_DB: 0
+      APP_LOG_LEVEL: debug
+      APP_LOG_FORMAT: console
+      APP_SERVICE_NAME: presdig
+      APP_EXPORTER: stdout
+      APP_ENDPOINT: "localhost:4317"
+      APP_INSECURE: "true"
+      APP_REDIRECTURL: "http://localhost:3000/callback"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      seeder:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: presdig
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./seeders:/seeders
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d presdig"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  consul:
+    image: consul:1.15
+    ports:
+      - "8500:8500"
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    command: "agent -dev -client=0.0.0.0"
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

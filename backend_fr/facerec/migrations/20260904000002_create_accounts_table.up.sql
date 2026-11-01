@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS accounts (
+    id VARCHAR(36) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    full_name VARCHAR(150) NOT NULL,
+    role_id VARCHAR(36) NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    nim_nip VARCHAR(50),
+    phone VARCHAR(30),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_username ON accounts(username);
+CREATE INDEX IF NOT EXISTS idx_accounts_nim_nip ON accounts(nim_nip);

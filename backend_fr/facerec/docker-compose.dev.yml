@@ -1,0 +1,11 @@
+# Development override - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+version: '3.8'
+
+services:
+  presdig-be:
+    build:
+      target: dev
+    volumes:
+      - ./framework:/app/framework
+      - ./libraries:/app/libraries
+      - ./facerec:/app/facerec

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button.danger {
+            background-color: #dc3545;
+        }
+        .button.danger:hover {
+            background-color: #c82333;
+        }
+        .cookie-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .visit-count {
+            font-size: 18px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-group input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{.Title}}</h1>
+            <p>{{.Message}}</p>
+        </div>
+
+        <div class="section">
+            <h3>🔄 Redirect Examples</h3>
+            <p>Test different redirect scenarios:</p>
+            <a href="/redirect" class="button">Basic Redirect</a>
+            <a href="/redirect?url=target" class="button">Redirect with URL parameter</a>
+            <a href="/target" class="button">Direct to Target</a>
+        </div>
+
+        <div class="section">
+            <h3>🍪 Cookie Management</h3>
+            <p>Visit count: <span class="visit-count">{{.Count}}</span></p>
+
+            <div class="form-group">
+                <label>Set custom cookie:</label><br>
+                <form action="/set-cookie" method="GET">
+                    <input type="text" name="name" placeholder="Cookie name" value="demo_cookie">
+                    <input type="text" name="value" placeholder="Cookie value" value="custom_value">
+                    <button type="submit" class="button">Set Cookie</button>
+                </form>
+            </div>
+
+            <a href="/set-cookie" class="button">Set Default Cookie</a>
+            <a href="/clear-cookie" class="button danger">Clear All Cookies</a>
+        </div>
+
+        <div class="section">
+            <h3>📋 Current Cookies</h3>
+            {{if .Cookies}}
+                <div class="cookie-display">
+                    {{range $name, $value := .Cookies}}
+                        <div><strong>{{$name}}:</strong> {{$value}}</div>
+                    {{end}}
+                </div>
+            {{else}}
+                <p>No cookies set</p>
+            {{end}}
+        </div>
+
+        <div class="section">
+            <h3>📝 How it works</h3>
+            <ul>
+                <li><strong>Redirects:</strong> Uses HTTP 303 See Other redirects</li>
+                <li><strong>Cookies:</strong> Sets HttpOnly cookies with 1-hour expiration</li>
+                <li><strong>Visit Counter:</strong> Tracks page visits using cookies</li>
+                <li><strong>Security:</strong> Uses SameSite lax mode for CSRF protection</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

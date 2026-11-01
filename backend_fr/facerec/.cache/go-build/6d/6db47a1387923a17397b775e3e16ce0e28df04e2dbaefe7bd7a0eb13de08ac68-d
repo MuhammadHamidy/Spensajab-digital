@@ -1,0 +1,6 @@
+./assign_role.go
+./find_all.go
+./get.go
+./sync_user.go
+./update_status.go
+./usecase.go

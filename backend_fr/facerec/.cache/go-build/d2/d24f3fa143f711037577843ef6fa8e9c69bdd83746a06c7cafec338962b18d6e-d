@@ -1,0 +1,7 @@
+./create.go
+./delete.go
+./find_all.go
+./get.go
+./list_permissions.go
+./update.go
+./usecase.go

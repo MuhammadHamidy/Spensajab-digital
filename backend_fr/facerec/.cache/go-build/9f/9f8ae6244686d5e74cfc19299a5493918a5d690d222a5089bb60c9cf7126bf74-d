@@ -1,0 +1,9 @@
+./config.go
+./error.go
+./module.go
+./resolver.go
+./source.go
+./source_env.go
+./source_file.go
+./source_http.go
+./source_kv.go

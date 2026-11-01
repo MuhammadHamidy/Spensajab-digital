@@ -1,0 +1,2678 @@
+definitions:
+  domain.Akun:
+    properties:
+      created_at:
+        type: string
+      farm_id:
+        type: string
+      id_akun:
+        type: integer
+      id_role:
+        type: integer
+      kategori_operator:
+        type: string
+      password:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_facerec_facerec-be_facerec_module_auth_domain.Role'
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  domain.BeratBadan:
+    properties:
+      berat_kg:
+        type: number
+      catatan:
+        type: string
+      created_at:
+        type: string
+      id_berat_badan:
+        type: integer
+      id_domba:
+        type: integer
+      tanggal_timbang:
+        type: string
+    type: object
+  domain.Domba:
+    properties:
+      asal:
+        type: string
+      berat_terakhir:
+        type: number
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      id_domba:
+        type: integer
+      id_induk_betina:
+        type: integer
+      id_induk_jantan:
+        type: integer
+      id_jenis:
+        type: integer
+      id_kandang:
+        type: integer
+      induk_betina:
+        $ref: '#/definitions/domain.Parent'
+      induk_jantan:
+        $ref: '#/definitions/domain.Parent'
+      jenis_kelamin:
+        type: string
+      kode_domba:
+        type: string
+      nama_domba:
+        type: string
+      nama_jenis:
+        type: string
+      status:
+        type: string
+      tanggal_lahir:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  domain.DombaBaru:
+    properties:
+      id_kandang:
+        type: integer
+      jenis_kelamin:
+        type: string
+      kode_domba:
+        type: string
+      nama_domba:
+        type: string
+    type: object
+  domain.Farm:
+    properties:
+      code:
+        type: string
+      createdAt:
+        type: string
+      createdBy:
+        type: string
+      deletedAt:
+        type: string
+      deletedBy:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      updatedAt:
+        type: string
+      updatedBy:
+        type: string
+    type: object
+  domain.InbreedingCheckRequest:
+    properties:
+      id_domba_betina:
+        type: integer
+      id_domba_jantan:
+        type: integer
+    type: object
+  domain.InbreedingCheckResponse:
+    properties:
+      coefficient_of_inbreeding:
+        type: number
+      flag_sedarah:
+        type: boolean
+      id_betina:
+        type: integer
+      id_jantan:
+        type: integer
+      leluhur_bersama:
+        items:
+          $ref: '#/definitions/domain.LeluhurBersama'
+        type: array
+      level_risiko:
+        type: string
+      persen_kekerabatan:
+        type: number
+      rekomendasi:
+        type: string
+    type: object
+  domain.Kandang:
+    properties:
+      created_at:
+        type: string
+      farm_id:
+        type: string
+      id_kandang:
+        type: integer
+      jenis_kandang:
+        type: string
+      jumlah_terisi:
+        type: integer
+      kapasitas:
+        type: integer
+      kode_kandang:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.Kehamilan:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      domba_betina:
+        $ref: '#/definitions/github_com_facerec_facerec-be_facerec_module_pregnancies_domain.DombaShort'
+      id_induk_betina:
+        type: integer
+      id_induk_jantan:
+        type: integer
+      id_kehamilan:
+        type: integer
+      id_perkawinan:
+        type: integer
+      prediksi_lahir:
+        type: string
+      status_kehamilan:
+        type: string
+      tanggal_hamil:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.Kelahiran:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      daftar_anak:
+        items:
+          $ref: '#/definitions/domain.DombaBaru'
+        type: array
+      id_kehamilan:
+        type: integer
+      id_kelahiran:
+        type: integer
+      jenis_kelamin_anak:
+        type: string
+      jumlah_anak:
+        type: integer
+      kondisi_anak:
+        type: string
+      tanggal_lahir:
+        type: string
+    type: object
+  domain.Kesehatan:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      diagnosa:
+        type: string
+      id_domba:
+        type: integer
+      id_kesehatan:
+        type: integer
+      nama_pemeriksa:
+        type: string
+      obat_diberikan:
+        type: string
+      tanggal_periksa:
+        type: string
+      tindakan:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.Kotoran:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      destination_type:
+        type: string
+      external_destination_id:
+        type: string
+      id_domba:
+        type: integer
+      id_kotoran:
+        type: integer
+      jenis_kegiatan:
+        description: pengambilan/fermentasi
+        type: string
+      jumlah:
+        type: number
+      satuan:
+        type: string
+    type: object
+  domain.LeluhurBersama:
+    properties:
+      id_domba:
+        type: integer
+      jalur:
+        items:
+          type: string
+        type: array
+      nama_domba:
+        type: string
+    type: object
+  domain.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  domain.LoginResponse:
+    properties:
+      akun:
+        $ref: '#/definitions/domain.Akun'
+      expires_at:
+        type: string
+      token:
+        type: string
+    type: object
+  domain.Notifikasi:
+    properties:
+      created_at:
+        type: string
+      id_akun:
+        type: integer
+      id_notifikasi:
+        type: integer
+      is_read:
+        type: boolean
+      judul:
+        type: string
+      pesan:
+        type: string
+      tipe:
+        description: system/reminder
+        type: string
+    type: object
+  domain.Pakan:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      external_source_id:
+        type: string
+      harga_per_satuan:
+        type: number
+      id_pakan:
+        type: integer
+      kategori:
+        type: string
+      nama_pakan:
+        type: string
+      satuan:
+        type: string
+      source_api_url:
+        type: string
+      source_type:
+        type: string
+      stok_terseida:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  domain.Parent:
+    properties:
+      id_domba:
+        type: integer
+      nama_domba:
+        type: string
+    type: object
+  domain.PemberianPakan:
+    properties:
+      catatan:
+        type: string
+      created_at:
+        type: string
+      id_domba:
+        type: integer
+      id_pakan:
+        type: integer
+      id_pemberian_pakan:
+        type: integer
+      jumlah:
+        type: number
+      nama_pakan:
+        type: string
+      satuan:
+        type: string
+      tanggal_pemberian:
+        type: string
+    type: object
+  domain.Perkawinan:
+    properties:
+      catatan:
+        type: string
+      coefficient_of_inbreeding:
+        type: number
+      created_at:
+        type: string
+      domba_betina:
+        $ref: '#/definitions/github_com_facerec_facerec-be_facerec_module_breedings_domain.DombaShort'
+      domba_jantan:
+        $ref: '#/definitions/github_com_facerec_facerec-be_facerec_module_breedings_domain.DombaShort'
+      flag_sedarah:
+        type: boolean
+      id_domba_betina:
+        type: integer
+      id_domba_jantan:
+        type: integer
+      id_perkawinan:
+        type: integer
+      metode_kawin:
+        type: string
+      status:
+        type: string
+      tanggal_kawin:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.RekomendasiItem:
+    properties:
+      jumlah_kg:
+        type: number
+      kategori:
+        type: string
+      keterangan:
+        type: string
+    type: object
+  domain.RekomendasiPakan:
+    properties:
+      berat_kg:
+        type: number
+      id_domba:
+        type: integer
+      nama_domba:
+        type: string
+      rekomendasi_harian:
+        items:
+          $ref: '#/definitions/domain.RekomendasiItem'
+        type: array
+      status:
+        type: string
+      total_pakan_harian_kg:
+        type: number
+    type: object
+  domain.Silsilah:
+    properties:
+      generasi:
+        type: integer
+      id_domba:
+        type: integer
+      induk_betina:
+        $ref: '#/definitions/domain.Silsilah'
+      induk_jantan:
+        $ref: '#/definitions/domain.Silsilah'
+      nama_domba:
+        type: string
+    type: object
+  domain.Task:
+    properties:
+      created_at:
+        type: string
+      deskripsi:
+        type: string
+      id_akun:
+        type: integer
+      id_task:
+        type: integer
+      judul:
+        type: string
+      kategori:
+        type: string
+      status:
+        description: pending/done
+        type: string
+      tanggal:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_facerec_facerec-be_facerec_module_auth_domain.Role:
+    properties:
+      created_at:
+        type: string
+      hak_akses:
+        type: string
+      id_role:
+        type: integer
+      nama_role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_facerec_facerec-be_facerec_module_breedings_domain.DombaShort:
+    properties:
+      id_domba:
+        type: integer
+      nama_domba:
+        type: string
+    type: object
+  github_com_facerec_facerec-be_facerec_module_pregnancies_domain.DombaShort:
+    properties:
+      id_domba:
+        type: integer
+      nama_domba:
+        type: string
+    type: object
+  http.AssignRoleRequest:
+    properties:
+      group_id:
+        description: Optional
+        type: string
+      institution_id:
+        type: string
+      role_id:
+        type: string
+    required:
+    - institution_id
+    - role_id
+    type: object
+  http.AssignRoleResponse:
+    properties:
+      id:
+        type: string
+    type: object
+  http.CreateFarmRequest:
+    properties:
+      code:
+        maxLength: 45
+        type: string
+      description:
+        type: string
+      location:
+        maxLength: 255
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  http.CreateRoleRequest:
+    properties:
+      description:
+        type: string
+      is_active:
+        description: Optional, default true handled logic? TRD doesn't specify default.
+        type: boolean
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    required:
+    - name
+    type: object
+  http.CreateRoleResponse:
+    properties:
+      id:
+        type: string
+    type: object
+  http.GetPermissionsResponse:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_system:
+        type: boolean
+      module:
+        type: string
+      page:
+        type: string
+      scope_type:
+        type: string
+      sub_module:
+        type: string
+    type: object
+  http.GetRoleByIDResponse:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      institution_id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    type: object
+  http.GetRolesResponse:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      institution_id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+    type: object
+  http.GetUserResponse:
+    properties:
+      external_subject:
+        type: string
+      id:
+        type: string
+      institution_id:
+        type: string
+      metadata:
+        additionalProperties: {}
+        type: object
+      status:
+        type: string
+    type: object
+  http.SyncUserRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  http.SyncUserResponse:
+    properties:
+      id:
+        type: string
+    type: object
+  http.UpdateFarmRequest:
+    properties:
+      code:
+        maxLength: 45
+        type: string
+      description:
+        type: string
+      location:
+        maxLength: 255
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  http.UpdateRoleRequest:
+    properties:
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    required:
+    - name
+    type: object
+  http.UpdateStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  responses.Error:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  responses.Meta:
+    properties:
+      page:
+        type: integer
+      size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  responses.Response-any:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-array_domain_Farm:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Farm'
+        type: array
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-array_http_GetPermissionsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/http.GetPermissionsResponse'
+        type: array
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-array_http_GetRolesResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/http.GetRolesResponse'
+        type: array
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-array_http_GetUserResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/http.GetUserResponse'
+        type: array
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-domain_Farm:
+    properties:
+      data:
+        $ref: '#/definitions/domain.Farm'
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-http_AssignRoleResponse:
+    properties:
+      data:
+        $ref: '#/definitions/http.AssignRoleResponse'
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-http_CreateRoleResponse:
+    properties:
+      data:
+        $ref: '#/definitions/http.CreateRoleResponse'
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-http_GetRoleByIDResponse:
+    properties:
+      data:
+        $ref: '#/definitions/http.GetRoleByIDResponse'
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+  responses.Response-http_SyncUserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/http.SyncUserResponse'
+      error:
+        $ref: '#/definitions/responses.Error'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/responses.Meta'
+      success:
+        type: boolean
+    type: object
+info:
+  contact: {}
+paths:
+  /api/akun:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all accounts with their roles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Akun'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of all accounts
+      tags:
+      - accounts
+    post:
+      consumes:
+      - application/json
+      description: Register a new account with role and operator category
+      parameters:
+      - description: Account details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Akun'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Akun'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new account
+      tags:
+      - accounts
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with username and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      summary: Login and get JWT token
+      tags:
+      - auth
+  /api/auth/login-operator:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate operator with only operator_id (username)
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      summary: Login as Operator without password
+      tags:
+      - auth
+  /api/domba:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all sheep with filtering by pen, gender, and status
+      parameters:
+      - description: Filter by pen ID
+        in: query
+        name: id_kandang
+        type: integer
+      - description: Filter by gender (Jantan/Betina)
+        in: query
+        name: jenis_kelamin
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Search by tag or nickname
+        in: query
+        name: search
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Domba'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of all sheep
+      tags:
+      - dombas
+    post:
+      consumes:
+      - application/json
+      description: Create a new sheep entry with initial details
+      parameters:
+      - description: Sheep details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Domba'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Domba'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Register a new sheep
+      tags:
+      - dombas
+  /api/domba/{id_domba}/pemberian-pakan:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve feeding history for a specific sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id_domba
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.PemberianPakan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get feeding history
+      tags:
+      - feeds
+    post:
+      consumes:
+      - application/json
+      description: Record that a sheep has been fed
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id_domba
+        required: true
+        type: integer
+      - description: Feeding details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.PemberianPakan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.PemberianPakan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record feeding
+      tags:
+      - feeds
+  /api/domba/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve specific sheep details by ID
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Domba'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get details of a sheep
+      tags:
+      - dombas
+  /api/domba/{id}/berat-badan:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all weight records for a specific sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.BeratBadan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get sheep weight history
+      tags:
+      - weights
+    post:
+      consumes:
+      - application/json
+      description: Create a new weight record for a specific sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Weight details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.BeratBadan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.BeratBadan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record new weight
+      tags:
+      - weights
+  /api/domba/{id}/kesehatan:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve health records for a specific sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Kesehatan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get health history
+      tags:
+      - health
+    post:
+      consumes:
+      - application/json
+      description: Record a new health examination for a sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Health check details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kesehatan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Kesehatan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record health check
+      tags:
+      - health
+  /api/domba/{id}/kotoran:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve manure collection records for a specific sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Kotoran'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get manure history
+      tags:
+      - manures
+    post:
+      consumes:
+      - application/json
+      description: Record a new manure collection event for a sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Manure details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kotoran'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Kotoran'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record manure activity
+      tags:
+      - manures
+  /api/domba/{id}/silsilah:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve family tree of a sheep up to specified generations
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Number of generations to traverse
+        in: query
+        name: generasi
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Silsilah'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get sheep genealogy
+      tags:
+      - dombas
+  /api/domba/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update the status (e.g., Sehat, Sakit, Terjual) of a sheep
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status details
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update sheep status
+      tags:
+      - dombas
+  /api/kandang:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all pens with filtering by type
+      parameters:
+      - description: Filter by pen type
+        in: query
+        name: jenis_kandang
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Kandang'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of all pens
+      tags:
+      - cages
+    post:
+      consumes:
+      - application/json
+      description: Create a new sheep pen with capacity and code
+      parameters:
+      - description: Pen details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kandang'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Kandang'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new pen
+      tags:
+      - cages
+  /api/kandang/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a pen by ID (fails if pen is not empty)
+      parameters:
+      - description: Pen ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a pen
+      tags:
+      - cages
+    get:
+      consumes:
+      - application/json
+      description: Retrieve specific pen details by ID
+      parameters:
+      - description: Pen ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Kandang'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get details of a pen
+      tags:
+      - cages
+    put:
+      consumes:
+      - application/json
+      description: Update details of an existing pen
+      parameters:
+      - description: Pen ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Pen details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kandang'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Kandang'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a pen
+      tags:
+      - cages
+  /api/kandang/verify/{kode}:
+    get:
+      consumes:
+      - application/json
+      description: Check if a pen code exists and get its details
+      parameters:
+      - description: Pen Code
+        in: path
+        name: kode
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Kandang'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Verify pen by code
+      tags:
+      - cages
+  /api/kehamilan:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all pregnancies with optional status filter
+      parameters:
+      - description: Filter by status (dikandung/lahir/gugur)
+        in: query
+        name: status_kehamilan
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Kehamilan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of pregnancies
+      tags:
+      - pregnancies
+    post:
+      consumes:
+      - application/json
+      description: Record a new pregnancy for a female sheep
+      parameters:
+      - description: Pregnancy details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kehamilan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Kehamilan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record pregnancy
+      tags:
+      - pregnancies
+  /api/kehamilan/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update the status of a pregnancy (e.g. to lahir or gugur)
+      parameters:
+      - description: Pregnancy ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status details
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update pregnancy status
+      tags:
+      - pregnancies
+  /api/kelahiran:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all birth records
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Kelahiran'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get birth history
+      tags:
+      - pregnancies
+    post:
+      consumes:
+      - application/json
+      description: Record a birth event and automatically register offspring
+      parameters:
+      - description: Birth details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kelahiran'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Kelahiran'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record birth
+      tags:
+      - pregnancies
+  /api/kesehatan/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Update details of a health examination
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Health check details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Kesehatan'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Kesehatan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update health record
+      tags:
+      - health
+  /api/notifications:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve notifications for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Notifikasi'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get my notifications
+      tags:
+      - notifications
+  /api/notifications/{id}/read:
+    patch:
+      consumes:
+      - application/json
+      description: Mark a notification as read
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Read notification
+      tags:
+      - notifications
+  /api/pakan/master:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all types of feed available in stock
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Pakan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of feeds
+      tags:
+      - feeds
+    post:
+      consumes:
+      - application/json
+      description: Register a new type of feed in master data
+      parameters:
+      - description: Feed details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Pakan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Pakan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Add new feed type
+      tags:
+      - feeds
+  /api/pakan/master/{id}/stok:
+    patch:
+      consumes:
+      - application/json
+      description: Add or subtract feed stock
+      parameters:
+      - description: Feed ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Stock update details
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update feed stock
+      tags:
+      - feeds
+  /api/pakan/rekomendasi/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Calculate recommended feed for a sheep based on its weight
+      parameters:
+      - description: Sheep ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.RekomendasiPakan'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get feed recommendation
+      tags:
+      - feeds
+  /api/perkawinan:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve history of sheep matings with filters
+      parameters:
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by inbreeding flag
+        in: query
+        name: flag_sedarah
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Perkawinan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of matings
+      tags:
+      - breeding
+    post:
+      consumes:
+      - application/json
+      description: Register a new mating event between two sheep
+      parameters:
+      - description: Mating details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Perkawinan'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Perkawinan'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Record a mating
+      tags:
+      - breeding
+  /api/perkawinan/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve specific mating event details by ID
+      parameters:
+      - description: Mating ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Perkawinan'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get mating details
+      tags:
+      - breeding
+  /api/perkawinan/cek-inbreeding:
+    post:
+      consumes:
+      - application/json
+      description: Calculate CoI and common ancestors between a pair of sheep
+      parameters:
+      - description: Pair details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.InbreedingCheckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.InbreedingCheckResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Check inbreeding risk
+      tags:
+      - breeding
+  /api/role:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all available roles in the system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_facerec_facerec-be_facerec_module_auth_domain.Role'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of all roles
+      tags:
+      - roles
+  /api/tasks:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve tasks assigned to the authenticated user
+      parameters:
+      - description: Filter by date (YYYY-MM-DD)
+        in: query
+        name: tanggal
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Task'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get my tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Create a new operational task
+      parameters:
+      - description: Task details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Task'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.Task'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Create task
+      tags:
+      - tasks
+  /api/tasks/{id}/complete:
+    patch:
+      consumes:
+      - application/json
+      description: Mark a task as completed
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Complete task
+      tags:
+      - tasks
+  /farms:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all farms with filters
+      parameters:
+      - description: Filter by farm code
+        in: query
+        name: code
+        type: string
+      - description: Filter by farm name
+        in: query
+        name: name
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-array_domain_Farm'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of farms
+      tags:
+      - farms
+    post:
+      consumes:
+      - application/json
+      description: Register a new farm in the system
+      parameters:
+      - description: Farm details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.CreateFarmRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/responses.Response-domain_Farm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new farm
+      tags:
+      - farms
+  /farms/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a farm by ID
+      parameters:
+      - description: Farm ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a farm
+      tags:
+      - farms
+    get:
+      consumes:
+      - application/json
+      description: Retrieve specific farm details by ID
+      parameters:
+      - description: Farm ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-domain_Farm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get farm details
+      tags:
+      - farms
+    put:
+      consumes:
+      - application/json
+      description: Update details of an existing farm
+      parameters:
+      - description: Farm ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Farm details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.UpdateFarmRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-domain_Farm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a farm
+      tags:
+      - farms
+  /roles:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all roles with pagination and search
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      - description: Search by name
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-array_http_GetRolesResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of roles
+      tags:
+      - roles
+    post:
+      consumes:
+      - application/json
+      description: Create a new role with permissions for an institution
+      parameters:
+      - description: Role details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/responses.Response-http_CreateRoleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new role
+      tags:
+      - roles
+  /roles/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a role by ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a role
+      tags:
+      - roles
+    get:
+      consumes:
+      - application/json
+      description: Retrieve specific role details with permissions
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-http_GetRoleByIDResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get role details
+      tags:
+      - roles
+    put:
+      consumes:
+      - application/json
+      description: Update details and permissions of an existing role
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a role
+      tags:
+      - roles
+  /roles/permissions:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all available permissions for role assignment
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      - description: Search by code or description
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-array_http_GetPermissionsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of permissions
+      tags:
+      - roles
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all users with pagination and search
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Search by external subject
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-array_http_GetUserResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Synchronize user data with external identity provider
+      parameters:
+      - description: Sync details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.SyncUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/responses.Response-http_SyncUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Sync user data
+      tags:
+      - users
+  /users/{id}/roles:
+    post:
+      consumes:
+      - application/json
+      description: Assign a specific role to a user within an institution
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assignment details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.AssignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/responses.Response-http_AssignRoleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Assign role to user
+      tags:
+      - users
+  /users/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update the activation status of a user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.Response-any'
+      security:
+      - ApiKeyAuth: []
+      summary: Update user status
+      tags:
+      - users
+swagger: "2.0"

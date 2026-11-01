@@ -1,0 +1,25 @@
+{
+  "app_name": "presdig",
+  "port": 8080,
+  "read_wait_timeout": "30s",
+  "write_wait_timeout": "30s",
+  "body_limit": 4194304,
+  "cors_allowed_origins": "*",
+  "enable_compress": true,
+
+  "postgres_url": "postgres://username:password@postgres:5432/presdig?sslmode=disable",
+
+  "redis_address": "redis:6379",
+  "redis_password": "",
+  "redis_db": 0,
+
+  "redirectUrl": "http://localhost:3000/callback",
+
+  "log_level": "debug",
+  "log_format": "console",
+
+  "service_name": "presdig",
+  "exporter": "stdout",
+  "endpoint": "localhost:4317",
+  "insecure": true
+}

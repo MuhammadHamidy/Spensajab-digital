@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #218838;
+        }
+        .button.primary {
+            background-color: #007bff;
+        }
+        .button.primary:hover {
+            background-color: #0056b3;
+        }
+        .cookie-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .visit-count {
+            font-size: 18px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .success-message {
+            color: #28a745;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 {{.Title}}</h1>
+            <div class="success-message">
+                ✅ {{.Message}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📊 Session Information</h3>
+            <p>Visit count: <span class="visit-count">{{.Count}}</span></p>
+
+            {{if .Cookies}}
+                <h4>Active Cookies:</h4>
+                <div class="cookie-display">
+                    {{range $name, $value := .Cookies}}
+                        <div><strong>{{$name}}:</strong> {{$value}}</div>
+                    {{end}}
+                </div>
+            {{else}}
+                <p>No cookies detected</p>
+            {{end}}
+        </div>
+
+        <div class="section">
+            <h3>🔄 Navigation Options</h3>
+            <a href="/" class="button primary">Back to Home</a>
+            <a href="/redirect" class="button">Test Another Redirect</a>
+        </div>
+
+        <div class="section">
+            <h3>📖 Redirect Details</h3>
+            <p>This page demonstrates:</p>
+            <ul>
+                <li>Successful redirection from various sources</li>
+                <li>Cookie persistence across redirects</li>
+                <li>Session tracking using HTTP cookies</li>
+                <li>Proper HTTP status codes for redirects</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: attendance_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pass}
+      POSTGRES_DB: ${DB_NAME:-presdig}
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-presdig}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: attendance_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    container_name: attendance_migrate
+    volumes:
+      - ./facerec/migrations:/migrations
+    command: -path=/migrations -database 'postgres://user:pass@postgres:5432/presdig?sslmode=disable' up
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seeder:
+    image: postgres:15-alpine
+    container_name: attendance_seeder
+    volumes:
+      - ./facerec/seeders:/seeders
+    environment:
+      PGPASSWORD: pass
+    command: >
+      sh -c "for f in /seeders/*.sql; do psql -h postgres -U user -d presdig -f \"$$f\"; done"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api-service:
+    build:
+      context: .
+      dockerfile: facerec/Dockerfile
+      target: dev
+    container_name: attendance_api_service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./framework:/app/framework
+      - ./libraries:/app/libraries
+      - ./facerec:/app/facerec
+      - ./go.work:/app/go.work
+    environment:
+      APP_NAME: presdig
+      APP_ENV: local
+      APP_PORT: 8080
+      APP_POSTGRES_URL: "postgres://user:pass@postgres:5432/presdig?sslmode=disable"
+      APP_REDIS_ADDRESS: "redis:6379"
+      APP_REDIS_PASSWORD: ""
+      APP_REDIS_DB: 0
+      APP_LOG_LEVEL: debug
+      APP_LOG_FORMAT: console
+      APP_SERVICE_NAME: presdig
+      WA_API_URL: "https://api.fonnte.com/send"
+      WA_API_KEY: "BZ2ULnUerGn1T74V8Uu8"
+      WA_SENDER_PHONE: "0881080697690"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USERNAME: "hamidym83@gmail.com"
+      SMTP_PASSWORD: "izjv gzwq cjzr eszu"
+      SMTP_FROM: "hamidym83@gmail.com"
+      SMTP_SENDER_NAME: "SMPN 1 Prambon - Presensi Digital"
+      APP_PORTAL_URL: "http://localhost:3000/login"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seeder:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:

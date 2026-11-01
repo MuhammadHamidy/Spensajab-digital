@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS classes (
+    id VARCHAR(36) PRIMARY KEY,
+    course_id VARCHAR(36) NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    class_code VARCHAR(30) NOT NULL,
+    dosen_id VARCHAR(36) NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    academic_year VARCHAR(30) NOT NULL,
+    room VARCHAR(50),
+    schedule_day VARCHAR(20),
+    schedule_time VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS class_enrollments (
+    id VARCHAR(36) PRIMARY KEY,
+    class_id VARCHAR(36) NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    student_id VARCHAR(36) NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_class_student UNIQUE (class_id, student_id)
+);

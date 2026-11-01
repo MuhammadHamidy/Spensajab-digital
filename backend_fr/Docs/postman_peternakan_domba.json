@@ -1,0 +1,1179 @@
+{
+  "info": {
+    "name": "API Sistem Peternakan Domba",
+    "description": "Postman Collection untuk API Sistem Peternakan Domba v1.0. RESTful JSON API dengan JWT Bearer Auth.\n\nBase URL: https://api.peternakan.app/v1\n\nUntuk menggunakan collection ini:\n1. Set variable `base_url` = https://api.peternakan.app/v1\n2. Login via POST /api/auth/login\n3. Copy token ke variable `token`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "peternakan-domba-v1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.peternakan.app/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT Bearer Token dari response login"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin01\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login & mendapatkan JWT token. Simpan token ke variable `token`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('token', json.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"token\": \"eyJ...\",\n  \"expires_at\": \"2024-12-01T10:00:00Z\",\n  \"akun\": {\n    \"id_akun\": 1,\n    \"username\": \"admin01\",\n    \"kategori_operator\": \"admin\",\n    \"role\": { \"id_role\": 1, \"nama_role\": \"Admin\", \"hak_akses\": \"full\" }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Akun & Role",
+      "item": [
+        {
+          "name": "Get Daftar Akun",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/akun",
+              "host": ["{{base_url}}"],
+              "path": ["api", "akun"]
+            },
+            "description": "Daftar akun pengguna (admin only)"
+          }
+        },
+        {
+          "name": "Buat Akun Operator Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"operator01\",\n  \"password\": \"password123\",\n  \"kategori_operator\": \"operator\",\n  \"id_role\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/akun",
+              "host": ["{{base_url}}"],
+              "path": ["api", "akun"]
+            },
+            "description": "Buat akun operator baru"
+          }
+        },
+        {
+          "name": "Get Daftar Role",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "role"]
+            },
+            "description": "Daftar role & hak akses"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cages",
+      "item": [
+        {
+          "name": "Get Daftar Cages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kandang?jenis_kandang=jantan&page=1&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kandang"],
+              "query": [
+                { "key": "jenis_kandang", "value": "jantan", "description": "jantan/betina/campuran/pedet (opsional)" },
+                { "key": "page", "value": "1", "description": "Default 1 (opsional)" },
+                { "key": "per_page", "value": "20", "description": "Default 20 (opsional)" }
+              ]
+            },
+            "description": "Daftar semua cages dengan filter & pagination"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_kandang\": 1,\n  \"kode_kandang\": \"K-001\",\n  \"kapasitas\": 20,\n  \"jenis_kandang\": \"jantan\",\n  \"jumlah_terisi\": 15\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Buat Cage Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kode_kandang\": \"K-005\",\n  \"kapasitas\": 25,\n  \"jenis_kandang\": \"betina\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kandang",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kandang"]
+            },
+            "description": "Buat cage baru. jenis_kandang: jantan/betina/campuran/pedet"
+          }
+        },
+        {
+          "name": "Get Detail Cage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kandang/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kandang", "1"]
+            },
+            "description": "Detail cage beserta daftar domba di dalamnya"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id_kandang\": 1,\n  \"kode_kandang\": \"K-001\",\n  \"kapasitas\": 20,\n  \"jenis_kandang\": \"jantan\",\n  \"domba\": [\n    { \"id_domba\": 5, \"kode_domba\": \"D-005\", \"nama_domba\": \"Bejo\", \"status\": \"aktif\" }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Cage",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kode_kandang\": \"K-001\",\n  \"kapasitas\": 30,\n  \"jenis_kandang\": \"jantan\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kandang/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kandang", "1"]
+            },
+            "description": "Update data cage"
+          }
+        },
+        {
+          "name": "Hapus Cage",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kandang/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kandang", "1"]
+            },
+            "description": "Hapus cage (hanya jika kosong). 409 jika masih ada domba."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Domba",
+      "item": [
+        {
+          "name": "Get Daftar Domba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba?id_kandang=1&jenis_kelamin=jantan&status=aktif&page=1&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba"],
+              "query": [
+                { "key": "id_kandang", "value": "1", "description": "Filter by kandang (opsional)" },
+                { "key": "jenis_kelamin", "value": "jantan", "description": "jantan/betina (opsional)" },
+                { "key": "id_jenis", "value": "", "description": "Filter by jenis domba (opsional)", "disabled": true },
+                { "key": "status", "value": "aktif", "description": "aktif/jual/mati (opsional)" },
+                { "key": "asal", "value": "", "description": "Filter asal domba (opsional)", "disabled": true },
+                { "key": "search", "value": "", "description": "Cari nama/kode (opsional)", "disabled": true },
+                { "key": "page", "value": "1", "description": "Default 1" },
+                { "key": "per_page", "value": "20", "description": "Default 20" }
+              ]
+            },
+            "description": "Daftar domba dengan filter lengkap"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_domba\": 5,\n  \"kode_domba\": \"D-005\",\n  \"nama_domba\": \"Bejo\",\n  \"jenis_kelamin\": \"jantan\",\n  \"tanggal_lahir\": \"2023-03-10\",\n  \"status\": \"aktif\",\n  \"asal\": \"lokal\",\n  \"id_kandang\": 1,\n  \"id_jenis\": 2,\n  \"nama_jenis\": \"Garut\",\n  \"id_induk_jantan\": null,\n  \"id_induk_betina\": null,\n  \"berat_terakhir\": 28.5\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Daftarkan Domba Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kode_domba\": \"D-010\",\n  \"nama_domba\": \"Bejo Jr\",\n  \"jenis_kelamin\": \"jantan\",\n  \"tanggal_lahir\": \"2024-05-01\",\n  \"status\": \"aktif\",\n  \"id_kandang\": 1,\n  \"id_jenis\": 2,\n  \"asal\": \"lokal\",\n  \"id_induk_jantan\": null,\n  \"id_induk_betina\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba"]
+            },
+            "description": "Daftarkan domba baru. Kapasitas kandang otomatis dicek — 422 jika penuh."
+          }
+        },
+        {
+          "name": "Get Detail Domba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba/5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5"]
+            },
+            "description": "Detail domba lengkap termasuk berat terkini & silsilah"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id_domba\": 5,\n  \"kode_domba\": \"D-005\",\n  \"nama_domba\": \"Bejo\",\n  \"jenis_kelamin\": \"jantan\",\n  \"tanggal_lahir\": \"2023-03-10\",\n  \"status\": \"aktif\",\n  \"id_kandang\": 1,\n  \"induk_jantan\": { \"id_domba\": 2, \"nama_domba\": \"Gagah\" },\n  \"induk_betina\": { \"id_domba\": 3, \"nama_domba\": \"Melati\" },\n  \"berat_terakhir\": 28.5,\n  \"jenis\": { \"id_jenis\": 2, \"nama_jenis\": \"Garut\" }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Domba",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_domba\": \"Bejo Update\",\n  \"id_kandang\": 2,\n  \"status\": \"aktif\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba/5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5"]
+            },
+            "description": "Update data domba (termasuk pindah kandang). Kapasitas kandang tujuan otomatis dicek."
+          }
+        },
+        {
+          "name": "Update Status Domba",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"jual\",\n  \"catatan\": \"Dijual ke pasar Cikaret\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "status"]
+            },
+            "description": "Ubah status domba. Status: aktif/jual/mati"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{ \"id_domba\": 5, \"status\": \"jual\", \"updated_at\": \"2024-11-01T10:00:00Z\" }"
+            }
+          ]
+        },
+        {
+          "name": "Get Silsilah Domba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/silsilah?generasi=3",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "silsilah"],
+              "query": [
+                { "key": "generasi", "value": "3", "description": "Default 3, maks 5 (opsional)" }
+              ]
+            },
+            "description": "Pohon silsilah domba (digunakan untuk analisis inbreeding). Endpoint baru hasil crosscheck."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id_domba\": 5,\n  \"nama_domba\": \"Bejo\",\n  \"generasi\": 3,\n  \"silsilah\": {\n    \"induk_jantan\": {\n      \"id_domba\": 2,\n      \"nama_domba\": \"Gagah\",\n      \"induk_jantan\": {},\n      \"induk_betina\": {}\n    },\n    \"induk_betina\": {\n      \"id_domba\": 3,\n      \"nama_domba\": \"Melati\",\n      \"induk_jantan\": {},\n      \"induk_betina\": {}\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Jenis Domba",
+      "item": [
+        {
+          "name": "Get Daftar Jenis Domba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jenis-domba",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jenis-domba"]
+            },
+            "description": "Daftar semua jenis domba (master data)"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{ \"id_jenis\": 1, \"nama_jenis\": \"Garut\", \"deskripsi_jenis\": \"Domba Garut asli Jawa Barat\" }]"
+            }
+          ]
+        },
+        {
+          "name": "Tambah Jenis Domba",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_jenis\": \"Merino\",\n  \"deskripsi_jenis\": \"Domba penghasil wol\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jenis-domba",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jenis-domba"]
+            },
+            "description": "Tambah jenis domba baru"
+          }
+        },
+        {
+          "name": "Update Jenis Domba",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_jenis\": \"Merino Updated\",\n  \"deskripsi_jenis\": \"Domba penghasil wol premium\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jenis-domba/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jenis-domba", "1"]
+            },
+            "description": "Update jenis domba"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Berat Badan",
+      "item": [
+        {
+          "name": "Get Riwayat Berat Badan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/berat-badan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "berat-badan"]
+            },
+            "description": "Riwayat penimbangan domba"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_berat_badan\": 10,\n  \"tanggal_timbang\": \"2024-10-15\",\n  \"berat_kg\": 28.5,\n  \"catatan\": \"Sehat, aktif\"\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Catat Timbangan Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tanggal_timbang\": \"2024-11-01\",\n  \"berat_kg\": 29.2,\n  \"catatan\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/berat-badan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "berat-badan"]
+            },
+            "description": "Catat timbangan baru. Otomatis trigger kalkulasi rekomendasi pakan."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{ \"id_berat_badan\": 11, \"id_domba\": 5, \"berat_kg\": 29.2 }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kesehatan",
+      "item": [
+        {
+          "name": "Get Riwayat Kesehatan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/kesehatan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "kesehatan"]
+            },
+            "description": "Riwayat pemeriksaan kesehatan"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_kesehatan\": 3,\n  \"tanggal_periksa\": \"2024-09-20\",\n  \"diagnosa\": \"Cacingan\",\n  \"tindakan\": \"Pemberian obat cacing\",\n  \"obat_diberikan\": \"Albendazole\",\n  \"nama_pemeriksa\": \"drh. Ari\",\n  \"catatan\": \"\"\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Catat Pemeriksaan Kesehatan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tanggal_periksa\": \"2024-11-01\",\n  \"diagnosa\": \"Sehat\",\n  \"tindakan\": \"Vaksinasi rutin\",\n  \"obat_diberikan\": \"\",\n  \"nama_pemeriksa\": \"drh. Ari\",\n  \"catatan\": \"Kondisi baik\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/kesehatan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "kesehatan"]
+            },
+            "description": "Catat pemeriksaan kesehatan baru"
+          }
+        },
+        {
+          "name": "Update Catatan Pemeriksaan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnosa\": \"Cacingan ringan\",\n  \"tindakan\": \"Pemberian obat cacing\",\n  \"obat_diberikan\": \"Albendazole\",\n  \"nama_pemeriksa\": \"drh. Ari\",\n  \"catatan\": \"Follow up 2 minggu\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kesehatan/3",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kesehatan", "3"]
+            },
+            "description": "Update catatan pemeriksaan kesehatan"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perkawinan",
+      "item": [
+        {
+          "name": "Cek Inbreeding (Pre-validation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_domba_jantan\": 2,\n  \"id_domba_betina\": 7\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/perkawinan/cek-inbreeding",
+              "host": ["{{base_url}}"],
+              "path": ["api", "perkawinan", "cek-inbreeding"]
+            },
+            "description": "Cek risiko inbreeding sebelum perkawinan dicatat. Menggunakan metode Wright (CoI), traversal 5 generasi. Endpoint ini hanya cek — tidak menyimpan data."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id_jantan\": 2,\n  \"id_betina\": 7,\n  \"coefficient_of_inbreeding\": 0.125,\n  \"persen_kekerabatan\": 12.5,\n  \"flag_sedarah\": true,\n  \"level_risiko\": \"sedang\",\n  \"leluhur_bersama\": [\n    { \"id_domba\": 1, \"nama_domba\": \"Induk Asli\", \"jalur\": [\"jantan>bapak\", \"betina>ibu\"] }\n  ],\n  \"rekomendasi\": \"Perkawinan berisiko. Pertimbangkan pasangan lain untuk mengurangi inbreeding depression.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Daftar Perkawinan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/perkawinan?status=selesai&flag_sedarah=false&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "perkawinan"],
+              "query": [
+                { "key": "id_domba", "value": "", "description": "Filter by domba jantan/betina (opsional)", "disabled": true },
+                { "key": "status", "value": "selesai", "description": "proses/selesai/gagal (opsional)" },
+                { "key": "flag_sedarah", "value": "false", "description": "true/false (opsional)" },
+                { "key": "tanggal_dari", "value": "", "description": "Format YYYY-MM-DD (opsional)", "disabled": true },
+                { "key": "tanggal_sampai", "value": "", "description": "Format YYYY-MM-DD (opsional)", "disabled": true },
+                { "key": "page", "value": "1" }
+              ]
+            },
+            "description": "Daftar perkawinan dengan filter"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_perkawinan\": 12,\n  \"tanggal_kawin\": \"2024-10-01\",\n  \"metode_kawin\": \"alami\",\n  \"status\": \"selesai\",\n  \"flag_sedarah\": false,\n  \"catatan\": \"\",\n  \"domba_jantan\": { \"id_domba\": 2, \"nama_domba\": \"Gagah\" },\n  \"domba_betina\": { \"id_domba\": 7, \"nama_domba\": \"Bunga\" }\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Catat Perkawinan Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_domba_jantan\": 2,\n  \"id_domba_betina\": 7,\n  \"tanggal_kawin\": \"2024-11-01\",\n  \"metode_kawin\": \"alami\",\n  \"status\": \"proses\",\n  \"catatan\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/perkawinan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "perkawinan"]
+            },
+            "description": "Catat perkawinan baru. Otomatis menjalankan cek-inbreeding dan menyimpan CoI ke flag_sedarah. metode_kawin: alami/IB"
+          }
+        },
+        {
+          "name": "Get Detail Perkawinan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/perkawinan/12",
+              "host": ["{{base_url}}"],
+              "path": ["api", "perkawinan", "12"]
+            },
+            "description": "Detail perkawinan beserta data kehamilan & kelahiran turunannya"
+          }
+        },
+        {
+          "name": "Update Status Perkawinan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"gagal\",\n  \"catatan\": \"Tidak ada tanda kehamilan setelah 60 hari\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/perkawinan/12/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "perkawinan", "12", "status"]
+            },
+            "description": "Update status perkawinan. Status: proses/selesai/gagal"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kehamilan",
+      "item": [
+        {
+          "name": "Catat Kehamilan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_perkawinan\": 12,\n  \"tanggal_hamil\": \"2024-08-10\",\n  \"status_kehamilan\": \"dikandung\",\n  \"prediksi_lahir\": \"2025-01-05\",\n  \"catatan\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kehamilan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kehamilan"]
+            },
+            "description": "Catat kehamilan dari hasil perkawinan. status_kehamilan: dikandung/lahir/gugur"
+          }
+        },
+        {
+          "name": "Get Daftar Kehamilan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kehamilan?status_kehamilan=dikandung&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kehamilan"],
+              "query": [
+                { "key": "status_kehamilan", "value": "dikandung", "description": "dikandung/lahir/gugur (opsional)" },
+                { "key": "page", "value": "1" }
+              ]
+            },
+            "description": "Daftar kehamilan aktif & riwayat"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_kehamilan\": 8,\n  \"tanggal_hamil\": \"2024-08-10\",\n  \"status_kehamilan\": \"dikandung\",\n  \"prediksi_lahir\": \"2025-01-05\",\n  \"id_perkawinan\": 12,\n  \"domba_betina\": { \"id_domba\": 7, \"nama_domba\": \"Bunga\" }\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Update Status Kehamilan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_kehamilan\": \"lahir\",\n  \"catatan\": \"Proses kelahiran berjalan lancar\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kehamilan/8/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kehamilan", "8", "status"]
+            },
+            "description": "Update status kehamilan"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kelahiran",
+      "item": [
+        {
+          "name": "Catat Kelahiran & Auto-Register Anak",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kehamilan\": 8,\n  \"tanggal_lahir\": \"2025-01-05\",\n  \"jumlah_anak\": 2,\n  \"jenis_kelamin_anak\": \"campuran\",\n  \"kondisi_anak\": \"sehat\",\n  \"catatan\": \"Proses normal\",\n  \"daftar_anak\": [\n    {\n      \"kode_domba\": \"D-020\",\n      \"nama_domba\": \"Kecil 1\",\n      \"jenis_kelamin\": \"jantan\",\n      \"id_kandang\": 3\n    },\n    {\n      \"kode_domba\": \"D-021\",\n      \"nama_domba\": \"Kecil 2\",\n      \"jenis_kelamin\": \"betina\",\n      \"id_kandang\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kelahiran",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kelahiran"]
+            },
+            "description": "Catat kelahiran & auto-register anak domba ke tabel Domba dengan id_induk terisi otomatis. kondisi_anak: sehat/lemah/mati"
+          }
+        },
+        {
+          "name": "Get Riwayat Kelahiran",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/kelahiran?tanggal_dari=2024-01-01&tanggal_sampai=2024-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kelahiran"],
+              "query": [
+                { "key": "tanggal_dari", "value": "2024-01-01", "description": "Filter dari tanggal (opsional)" },
+                { "key": "tanggal_sampai", "value": "2024-12-31", "description": "Filter sampai tanggal (opsional)" }
+              ]
+            },
+            "description": "Riwayat kelahiran dengan filter tanggal"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pakan & Pemberian Pakan",
+      "item": [
+        {
+          "name": "Master Pakan",
+          "item": [
+            {
+              "name": "Get Daftar Master Pakan",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/master",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "master"]
+                },
+                "description": "Daftar jenis pakan beserta stok. Endpoint baru hasil crosscheck ERD."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "[{\n  \"id_pakan\": 1,\n  \"nama_pakan\": \"Rumput Gajah\",\n  \"satuan\": \"kg\",\n  \"stok_tersedia\": 500.0,\n  \"harga_per_satuan\": 2000,\n  \"kategori\": \"hijauan\",\n  \"catatan\": \"\"\n}]"
+                }
+              ]
+            },
+            {
+              "name": "Tambah Jenis Pakan",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nama_pakan\": \"Rumput Gajah\",\n  \"satuan\": \"kg\",\n  \"stok_awal\": 500.0,\n  \"harga_per_satuan\": 2000,\n  \"kategori\": \"hijauan\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/master",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "master"]
+                },
+                "description": "Tambah jenis pakan baru ke master data. kategori: hijauan/konsentrat/suplemen. satuan: kg/ikat/liter"
+              }
+            },
+            {
+              "name": "Update Stok Pakan",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"jumlah\": 200,\n  \"tipe\": \"tambah\",\n  \"catatan\": \"Pembelian batch Oktober\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/master/1/stok",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "master", "1", "stok"]
+                },
+                "description": "Update stok pakan. tipe: tambah/kurang. 422 jika stok tidak cukup untuk pengurangan."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "{ \"id_pakan\": 1, \"stok_sebelum\": 500, \"stok_sesudah\": 700 }"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Rekomendasi Pakan",
+          "item": [
+            {
+              "name": "Get Rekomendasi Pakan per Domba",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/rekomendasi/5",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "rekomendasi", "5"]
+                },
+                "description": "Kalkulasi kebutuhan pakan berdasarkan berat badan & status domba. 10% BB untuk hijauan, 1.5% BB untuk konsentrat. Faktor penggali berbeda untuk domba hamil/menyusui."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "{\n  \"id_domba\": 5,\n  \"nama_domba\": \"Bejo\",\n  \"berat_kg\": 28.5,\n  \"status\": \"aktif\",\n  \"rekomendasi_harian\": [\n    { \"kategori\": \"hijauan\", \"jumlah_kg\": 2.85, \"keterangan\": \"10% berat badan (hijauan segar)\" },\n    { \"kategori\": \"konsentrat\", \"jumlah_kg\": 0.43, \"keterangan\": \"1.5% berat badan\" }\n  ],\n  \"total_pakan_harian_kg\": 3.28\n}"
+                }
+              ]
+            },
+            {
+              "name": "Get Rekomendasi Pakan per Kandang",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/rekomendasi/kandang/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "rekomendasi", "kandang", "1"]
+                },
+                "description": "Total kebutuhan pakan seluruh domba dalam satu kandang"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "{\n  \"id_kandang\": 1,\n  \"jumlah_domba\": 15,\n  \"total_hijauan_kg\": 42.75,\n  \"total_konsentrat_kg\": 6.41,\n  \"per_domba\": []\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pemberian Pakan",
+          "item": [
+            {
+              "name": "Get Riwayat Pemberian Pakan",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/domba/5/pemberian-pakan",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "domba", "5", "pemberian-pakan"]
+                },
+                "description": "Riwayat pemberian pakan untuk satu domba"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "[{\n  \"id_pemberian_pakan\": 55,\n  \"tanggal_pemberian\": \"2024-10-30\",\n  \"id_pakan\": 1,\n  \"nama_pakan\": \"Rumput Gajah\",\n  \"jumlah\": 3.0,\n  \"satuan\": \"kg\",\n  \"catatan\": \"\"\n}]"
+                }
+              ]
+            },
+            {
+              "name": "Catat Pemberian Pakan",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tanggal_pemberian\": \"2024-11-01\",\n  \"id_pakan\": 1,\n  \"jumlah\": 3.0,\n  \"satuan\": \"kg\",\n  \"catatan\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/domba/5/pemberian-pakan",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "domba", "5", "pemberian-pakan"]
+                },
+                "description": "Catat pemberian pakan & otomatis kurangi stok master pakan. 422 jika stok tidak mencukupi."
+              }
+            },
+            {
+              "name": "Get Laporan Konsumsi Pakan",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/pakan/laporan?tanggal_dari=2024-10-01&tanggal_sampai=2024-10-31&id_kandang=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "pakan", "laporan"],
+                  "query": [
+                    { "key": "tanggal_dari", "value": "2024-10-01" },
+                    { "key": "tanggal_sampai", "value": "2024-10-31" },
+                    { "key": "id_kandang", "value": "1", "description": "Filter by kandang (opsional)" }
+                  ]
+                },
+                "description": "Laporan konsumsi pakan per periode"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "body": "{\n  \"periode\": \"2024-10-01/2024-10-31\",\n  \"total_konsumsi\": [\n    { \"nama_pakan\": \"Rumput Gajah\", \"total_kg\": 1350, \"biaya_estimasi\": 2700000 }\n  ],\n  \"per_domba\": []\n}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kotoran Ternak",
+      "item": [
+        {
+          "name": "Get Riwayat Kotoran",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/kotoran",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "kotoran"]
+            },
+            "description": "Riwayat pencatatan kotoran ternak"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_kotoran\": 20,\n  \"jenis_kegiatan\": \"pengambilan\",\n  \"jumlah\": 5.0,\n  \"satuan\": \"kg\",\n  \"catatan\": \"\"\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Catat Kegiatan Kotoran",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jenis_kegiatan\": \"pengambilan\",\n  \"jumlah\": 5.0,\n  \"satuan\": \"kg\",\n  \"catatan\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/domba/5/kotoran",
+              "host": ["{{base_url}}"],
+              "path": ["api", "domba", "5", "kotoran"]
+            },
+            "description": "Catat kegiatan kotoran ternak. jenis_kegiatan: pengambilan/fermentasi"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inbreeding Detection",
+      "item": [
+        {
+          "name": "Get Laporan Inbreeding",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/inbreeding/laporan?level_risiko=tinggi&tanggal_dari=2024-01-01",
+              "host": ["{{base_url}}"],
+              "path": ["api", "inbreeding", "laporan"],
+              "query": [
+                { "key": "level_risiko", "value": "tinggi", "description": "aman/sedang/tinggi (opsional)" },
+                { "key": "tanggal_dari", "value": "2024-01-01", "description": "Filter dari tanggal (opsional)" },
+                { "key": "tanggal_sampai", "value": "", "description": "Filter sampai tanggal (opsional)", "disabled": true }
+              ]
+            },
+            "description": "Laporan seluruh perkawinan yang terdeteksi sedarah. level_risiko: aman (<6.25%), sedang (6.25-12.5%), tinggi (>12.5%)"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_perkawinan\": 12,\n  \"tanggal_kawin\": \"2024-07-15\",\n  \"coefficient_of_inbreeding\": 0.25,\n  \"level_risiko\": \"tinggi\",\n  \"domba_jantan\": { \"id_domba\": 2, \"nama_domba\": \"Gagah\" },\n  \"domba_betina\": { \"id_domba\": 7, \"nama_domba\": \"Bunga\" }\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Saran Pasangan Terbaik",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_domba\": 5,\n  \"batas_coi\": 0.0625,\n  \"limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/inbreeding/saran-pasangan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "inbreeding", "saran-pasangan"]
+            },
+            "description": "Sarankan daftar pasangan terbaik (CoI terendah) untuk domba tertentu dari seluruh domba lawan jenis yang aktif. Berguna untuk perencanaan perkawinan."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_domba\": 12,\n  \"nama_domba\": \"Sari\",\n  \"jenis_kelamin\": \"betina\",\n  \"coefficient_of_inbreeding\": 0.0,\n  \"rekomendasi\": \"Pasangan ideal — tidak ada leluhur bersama\"\n},{\n  \"id_domba\": 14,\n  \"nama_domba\": \"Putri\",\n  \"coefficient_of_inbreeding\": 0.03125,\n  \"rekomendasi\": \"Pasangan aman — CoI di bawah threshold\"\n}]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Get Daftar Tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks?tanggal=2026-05-16",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tasks"],
+              "query": [
+                { "key": "tanggal", "value": "2026-05-16", "description": "Filter by date YYYY-MM-DD (opsional)" }
+              ]
+            },
+            "description": "Daftar tugas milik akun yang login"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_task\": 1,\n  \"judul\": \"Pemberian pakan kandang A\",\n  \"deskripsi\": \"Berikan rumput gajah 3 kg per domba\",\n  \"tanggal\": \"2026-05-16T00:00:00Z\",\n  \"status\": \"pending\",\n  \"id_akun\": 1,\n  \"kategori\": \"pakan\",\n  \"created_at\": \"2026-05-16T08:00:00Z\",\n  \"updated_at\": \"2026-05-16T08:00:00Z\"\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Buat Task Baru",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judul\": \"Pemberian pakan kandang A\",\n  \"deskripsi\": \"Berikan rumput gajah 3 kg per domba\",\n  \"tanggal\": \"2026-05-16T00:00:00Z\",\n  \"status\": \"pending\",\n  \"kategori\": \"pakan\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Buat task baru. Kategori: pakan/kesehatan/kebersihan/dll"
+          }
+        },
+        {
+          "name": "Selesaikan Task",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tasks/1/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tasks", "1", "complete"]
+            },
+            "description": "Menandai task telah selesai dikerjakan (mengubah status menjadi 'done')"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Daftar Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications"]
+            },
+            "description": "Daftar notifikasi milik akun yang login."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "[{\n  \"id_notifikasi\": 1,\n  \"judul\": \"Inbreeding Warning\",\n  \"pesan\": \"Perkawinan Gagah x Bunga terdeteksi sedarah (CoI: 25%). Segera review.\",\n  \"is_read\": false,\n  \"id_akun\": 1,\n  \"tipe\": \"system\",\n  \"created_at\": \"2026-05-16T08:00:00Z\"\n}]"
+            }
+          ]
+        },
+        {
+          "name": "Tandai Notification Sudah Dibaca",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/1/read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "1", "read"]
+            },
+            "description": "Tandai satu notifikasi sudah dibaca (is_read = true)"
+          }
+        }
+      ]
+    }
+  ]
+}

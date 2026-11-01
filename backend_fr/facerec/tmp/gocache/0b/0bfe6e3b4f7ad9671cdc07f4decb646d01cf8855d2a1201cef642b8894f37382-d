@@ -1,0 +1,7 @@
+./delete.go
+./find_all.go
+./find_all_permissions.go
+./find_by_id.go
+./repository.go
+./store.go
+./update.go

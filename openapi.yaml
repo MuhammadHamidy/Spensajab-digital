@@ -1,0 +1,1588 @@
+openapi: 3.0.3
+info:
+  title: Sistem Absensi Pembelajaran Kelas - Face Recognition API
+  description: |
+    API contract untuk sistem absensi pembelajaran kelas berbasis pengenalan wajah (face recognition).
+    Mencakup manajemen pengguna (admin, guru, siswa), kelas, jadwal, sesi pembelajaran,
+    enrollment data wajah, serta pencatatan dan pelaporan absensi otomatis maupun manual.
+
+    Lihat file API_DOCUMENTATION.md untuk penjelasan alur kerja, contoh request/response,
+    dan daftar asumsi desain.
+  version: "1.0.0"
+  contact:
+    name: Tim Pengembang Absensi Kelas
+    email: support@absensi-kelas.example.com
+servers:
+  - url: https://api.absensi-kelas.example.com/api/v1
+    description: Production
+  - url: https://staging-api.absensi-kelas.example.com/api/v1
+    description: Staging
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Autentikasi dan manajemen sesi login
+  - name: Users
+    description: Manajemen akun pengguna (admin, guru, siswa)
+  - name: Face Profile
+    description: Enrollment dan manajemen data wajah pengguna
+  - name: Classes
+    description: Manajemen kelas dan anggota kelas
+  - name: Schedules
+    description: Jadwal rutin mingguan per kelas
+  - name: Sessions
+    description: Sesi pembelajaran (instans tanggal tertentu) tempat absensi berlangsung
+  - name: Attendance
+    description: Pencatatan absensi melalui face recognition maupun manual
+  - name: Reports
+    description: Rekap dan ekspor laporan absensi
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ============================= AUTH =============================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi akun baru (guru/siswa)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Akun berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '409':
+          description: Email atau nomor identitas sudah terdaftar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login dan mendapatkan access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Memperbarui access token menggunakan refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          access_token:
+                            type: string
+                          expires_in:
+                            type: integer
+                            example: 3600
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout dan mencabut refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Mengambil profil pengguna yang sedang login
+      responses:
+        '200':
+          description: Profil pengguna
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================= USERS =============================
+  /users:
+    get:
+      tags: [Users]
+      summary: Daftar pengguna (admin)
+      description: "Hanya admin. Bisa difilter berdasarkan role dan pencarian nama/email."
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, teacher, student]
+      responses:
+        '200':
+          description: Daftar pengguna
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Users]
+      summary: Membuat akun pengguna baru (admin)
+      description: "Hanya admin. Berguna untuk import massal guru/siswa tanpa alur self-register."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '201':
+          description: Pengguna berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Users]
+      summary: Detail pengguna
+      responses:
+        '200':
+          description: Detail pengguna
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Users]
+      summary: Memperbarui data pengguna
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: Pengguna berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Users]
+      summary: Menonaktifkan (soft delete) akun pengguna
+      description: "Hanya admin. Akun dinonaktifkan, bukan dihapus permanen, agar riwayat absensi tetap utuh."
+      responses:
+        '200':
+          description: Pengguna berhasil dinonaktifkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ========================= FACE PROFILE =========================
+  /users/{userId}/face-profile:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Face Profile]
+      summary: Status enrollment wajah pengguna
+      responses:
+        '200':
+          description: Status face profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FaceProfile'
+        '404':
+          description: Pengguna belum memiliki face profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Face Profile]
+      summary: Enrollment / registrasi wajah pengguna
+      description: |
+        Mengunggah minimal 3 foto wajah (sudut berbeda, pencahayaan cukup) untuk membuat
+        embedding wajah yang disimpan sebagai referensi pengenalan. Proses ekstraksi embedding
+        berjalan di sisi server (implementasi model bebas, lihat catatan di API_DOCUMENTATION.md).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  minItems: 3
+                  maxItems: 10
+                  items:
+                    type: string
+                    format: binary
+                  description: Minimal 3 foto wajah, format JPG/PNG, maks 5MB per foto
+      responses:
+        '201':
+          description: Enrollment berhasil diproses
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FaceProfile'
+        '422':
+          description: Wajah tidak terdeteksi jelas pada salah satu foto, atau jumlah foto kurang dari minimum
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Face Profile]
+      summary: Menghapus data wajah (perlu enrollment ulang)
+      responses:
+        '200':
+          description: Face profile berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================= CLASSES =============================
+  /classes:
+    get:
+      tags: [Classes]
+      summary: Daftar kelas
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: teacher_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Daftar kelas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Class'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Classes]
+      summary: Membuat kelas baru
+      description: "Hanya admin atau guru."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassCreateRequest'
+      responses:
+        '201':
+          description: Kelas berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Class'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /classes/{classId}:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+    get:
+      tags: [Classes]
+      summary: Detail kelas
+      responses:
+        '200':
+          description: Detail kelas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Class'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Classes]
+      summary: Memperbarui kelas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassCreateRequest'
+      responses:
+        '200':
+          description: Kelas berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Class'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Classes]
+      summary: Menghapus kelas
+      responses:
+        '200':
+          description: Kelas berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /classes/{classId}/students:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+    get:
+      tags: [Classes]
+      summary: Daftar siswa terdaftar di kelas
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Daftar siswa
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Classes]
+      summary: Mendaftarkan satu atau lebih siswa ke kelas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_ids]
+              properties:
+                student_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Siswa berhasil didaftarkan ke kelas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '409':
+          description: Salah satu siswa sudah terdaftar di kelas ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /classes/{classId}/students/{studentId}:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Classes]
+      summary: Mengeluarkan siswa dari kelas
+      responses:
+        '200':
+          description: Siswa berhasil dikeluarkan dari kelas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================= SCHEDULES =============================
+  /classes/{classId}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+    get:
+      tags: [Schedules]
+      summary: Daftar jadwal rutin mingguan kelas
+      responses:
+        '200':
+          description: Daftar jadwal
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Schedule'
+    post:
+      tags: [Schedules]
+      summary: Menambahkan jadwal rutin baru untuk kelas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreateRequest'
+      responses:
+        '201':
+          description: Jadwal berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Schedule'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /schedules/{scheduleId}:
+    parameters:
+      - name: scheduleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [Schedules]
+      summary: Memperbarui jadwal rutin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreateRequest'
+      responses:
+        '200':
+          description: Jadwal berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Schedule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Schedules]
+      summary: Menghapus jadwal rutin
+      responses:
+        '200':
+          description: Jadwal berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================= SESSIONS =============================
+  /schedules/{scheduleId}/sessions:
+    parameters:
+      - name: scheduleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Sessions]
+      summary: Daftar sesi (instans pertemuan) dari suatu jadwal
+      parameters:
+        - $ref: '#/components/parameters/DateFromParam'
+        - $ref: '#/components/parameters/DateToParam'
+      responses:
+        '200':
+          description: Daftar sesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Session'
+    post:
+      tags: [Sessions]
+      summary: Membuat sesi pertemuan untuk tanggal tertentu
+      description: |
+        Umumnya sesi dibuat otomatis oleh scheduler (cron) berdasarkan jadwal rutin,
+        namun endpoint ini disediakan untuk pembuatan manual (mis. kelas pengganti/susulan).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date:
+                  type: string
+                  format: date
+                room_override:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Sesi berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+
+  /sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    get:
+      tags: [Sessions]
+      summary: Detail sesi
+      responses:
+        '200':
+          description: Detail sesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sessions/{sessionId}/open:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Sessions]
+      summary: Membuka sesi untuk menerima absensi
+      description: "Hanya guru pemilik kelas. Setelah dibuka, endpoint recognize/manual dapat menerima absensi."
+      responses:
+        '200':
+          description: Sesi berhasil dibuka
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '409':
+          description: Sesi sudah dibuka atau sudah ditutup sebelumnya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sessions/{sessionId}/close:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Sessions]
+      summary: Menutup sesi
+      description: |
+        Menutup jendela absensi. Siswa terdaftar di kelas yang belum memiliki record
+        absensi pada sesi ini otomatis diberi status ALPHA.
+      responses:
+        '200':
+          description: Sesi berhasil ditutup, absensi ALPHA otomatis dicatat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+
+  # ============================= ATTENDANCE =============================
+  /sessions/{sessionId}/attendance:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    get:
+      tags: [Attendance]
+      summary: Daftar absensi pada suatu sesi
+      responses:
+        '200':
+          description: Daftar absensi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Attendance'
+
+  /sessions/{sessionId}/attendance/recognize:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Attendance]
+      summary: Mencatat absensi via pengenalan wajah (satu wajah per gambar)
+      description: |
+        Alur utama absensi: klien (web/kios) mengambil satu foto wajah siswa lalu mengirimkannya
+        ke endpoint ini. Server mendeteksi wajah, mencocokkan dengan face profile siswa yang
+        terdaftar di kelas terkait sesi ini, lalu mencatat status HADIR/TERLAMBAT sesuai waktu submit.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Foto wajah hasil capture kamera, format JPG/PNG, maks 5MB
+                device_id:
+                  type: string
+                  description: Identifier perangkat/kios yang digunakan (opsional)
+                latitude:
+                  type: number
+                  format: float
+                  nullable: true
+                longitude:
+                  type: number
+                  format: float
+                  nullable: true
+      responses:
+        '200':
+          description: Wajah berhasil dikenali, absensi tercatat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+        '404':
+          description: FACE_NOT_RECOGNIZED — wajah terdeteksi namun tidak cocok dengan siswa manapun di kelas ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: DUPLICATE_ATTENDANCE — siswa ini sudah tercatat hadir pada sesi ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: NO_FACE_DETECTED atau MULTIPLE_FACES_DETECTED pada gambar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '423':
+          description: SESSION_NOT_OPEN — sesi belum dibuka atau sudah ditutup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /sessions/{sessionId}/attendance/recognize-batch:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Attendance]
+      summary: "(Opsional/lanjutan) Mencatat absensi banyak siswa dari satu gambar"
+      description: |
+        Untuk skenario kamera pintu/kelas yang menangkap beberapa wajah sekaligus.
+        Mengembalikan hasil pencocokan per wajah yang terdeteksi (bisa campuran matched/unmatched).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Hasil pemrosesan gambar (bisa berisi kombinasi wajah cocok dan tidak cocok)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          faces_detected:
+                            type: integer
+                            example: 3
+                          matched:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Attendance'
+                          unmatched_count:
+                            type: integer
+                            example: 1
+
+  /sessions/{sessionId}/attendance/manual:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Attendance]
+      summary: Mencatat/override absensi secara manual oleh guru
+      description: "Untuk kasus IZIN, SAKIT, kendala teknis kamera, atau koreksi hasil pengenalan wajah."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualAttendanceRequest'
+      responses:
+        '200':
+          description: Absensi manual berhasil dicatat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /attendance/{attendanceId}:
+    parameters:
+      - name: attendanceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [Attendance]
+      summary: Mengoreksi status/catatan sebuah record absensi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [HADIR, TERLAMBAT, IZIN, SAKIT, ALPHA]
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Absensi berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Attendance'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /students/{studentId}/attendance:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Attendance]
+      summary: Riwayat absensi seorang siswa
+      parameters:
+        - name: class_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/DateFromParam'
+        - $ref: '#/components/parameters/DateToParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Riwayat absensi siswa
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Attendance'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+
+  # ============================= REPORTS =============================
+  /classes/{classId}/attendance/report:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+    get:
+      tags: [Reports]
+      summary: Rekap absensi per siswa dalam suatu kelas
+      parameters:
+        - $ref: '#/components/parameters/DateFromParam'
+        - $ref: '#/components/parameters/DateToParam'
+      responses:
+        '200':
+          description: Rekap absensi kelas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AttendanceRecap'
+
+  /classes/{classId}/attendance/export:
+    parameters:
+      - $ref: '#/components/parameters/ClassIdParam'
+    get:
+      tags: [Reports]
+      summary: Mengekspor laporan absensi kelas ke file
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [xlsx, pdf]
+        - $ref: '#/components/parameters/DateFromParam'
+        - $ref: '#/components/parameters/DateToParam'
+      responses:
+        '200':
+          description: File laporan (biner) sesuai format yang diminta
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {}
+            application/pdf: {}
+
+  /dashboard/summary:
+    get:
+      tags: [Reports]
+      summary: Ringkasan dashboard (total kelas, sesi hari ini, tingkat kehadiran)
+      responses:
+        '200':
+          description: Ringkasan dashboard
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_classes:
+                            type: integer
+                          sessions_today:
+                            type: integer
+                          attendance_rate_today:
+                            type: number
+                            format: float
+                            example: 92.5
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+    SearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+    DateFromParam:
+      name: date_from
+      in: query
+      schema:
+        type: string
+        format: date
+    DateToParam:
+      name: date_to
+      in: query
+      schema:
+        type: string
+        format: date
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClassIdParam:
+      name: classId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Token tidak valid, kadaluarsa, atau tidak disertakan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Pengguna tidak memiliki izin untuk aksi ini
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Input tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Terlalu banyak percobaan dalam waktu singkat
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Berhasil
+        data: {}
+        meta:
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Terjadi kesalahan
+        error_code:
+          type: string
+          example: VALIDATION_ERROR
+        errors:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total_items:
+          type: integer
+          example: 154
+        total_pages:
+          type: integer
+          example: 8
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password, role, identity_number]
+      properties:
+        name:
+          type: string
+          example: Ahmad Fauzi
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        role:
+          type: string
+          enum: [teacher, student]
+        identity_number:
+          type: string
+          description: NIP untuk guru, NIM/NIS untuk siswa
+          example: "105222014"
+
+    UserCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegisterRequest'
+        - type: object
+          properties:
+            role:
+              type: string
+              enum: [admin, teacher, student]
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        identity_number:
+          type: string
+        is_active:
+          type: boolean
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Ahmad Fauzi
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, teacher, student]
+        identity_number:
+          type: string
+        photo_url:
+          type: string
+          format: uri
+          nullable: true
+        face_enrolled:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+
+    FaceProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, enrolled, failed]
+        sample_count:
+          type: integer
+          example: 4
+        enrolled_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    ClassCreateRequest:
+      type: object
+      required: [name, code, subject]
+      properties:
+        name:
+          type: string
+          example: Struktur Data Kelas A
+        code:
+          type: string
+          example: IF2301-A
+        subject:
+          type: string
+          example: Struktur Data
+        teacher_id:
+          type: string
+          format: uuid
+          description: Wajib diisi jika yang membuat adalah admin
+
+    Class:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        subject:
+          type: string
+        teacher_id:
+          type: string
+          format: uuid
+        teacher_name:
+          type: string
+        total_students:
+          type: integer
+          example: 32
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ScheduleCreateRequest:
+      type: object
+      required: [day_of_week, start_time, end_time, room]
+      properties:
+        day_of_week:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+        start_time:
+          type: string
+          example: "07:30"
+        end_time:
+          type: string
+          example: "09:10"
+        room:
+          type: string
+          example: "R.301"
+        late_tolerance_minutes:
+          type: integer
+          default: 15
+          description: Batas menit setelah start_time sebelum status berubah menjadi TERLAMBAT
+
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        class_id:
+          type: string
+          format: uuid
+        day_of_week:
+          type: string
+        start_time:
+          type: string
+        end_time:
+          type: string
+        room:
+          type: string
+        late_tolerance_minutes:
+          type: integer
+        is_active:
+          type: boolean
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        schedule_id:
+          type: string
+          format: uuid
+        class_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+        end_time:
+          type: string
+        room:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, open, closed, cancelled]
+        opened_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ManualAttendanceRequest:
+      type: object
+      required: [student_id, status]
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [HADIR, TERLAMBAT, IZIN, SAKIT, ALPHA]
+        notes:
+          type: string
+          nullable: true
+          example: Surat izin dari orang tua
+
+    Attendance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        student_name:
+          type: string
+        status:
+          type: string
+          enum: [HADIR, TERLAMBAT, IZIN, SAKIT, ALPHA]
+        method:
+          type: string
+          enum: [face_recognition, manual]
+        confidence_score:
+          type: number
+          format: float
+          nullable: true
+          example: 0.97
+        liveness_passed:
+          type: boolean
+          nullable: true
+        captured_photo_url:
+          type: string
+          format: uri
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: Diisi jika dicatat manual oleh guru
+        notes:
+          type: string
+          nullable: true
+
+    AttendanceRecap:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        student_name:
+          type: string
+        total_sessions:
+          type: integer
+          example: 14
+        hadir:
+          type: integer
+        terlambat:
+          type: integer
+        izin:
+          type: integer
+        sakit:
+          type: integer
+        alpha:
+          type: integer
+        attendance_rate:
+          type: number
+          format: float
+          example: 92.9

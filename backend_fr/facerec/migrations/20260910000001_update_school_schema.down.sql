@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS teacher_courses;
+ALTER TABLE accounts DROP COLUMN IF EXISTS nisn;
+ALTER TABLE accounts DROP COLUMN IF EXISTS parent_phone;
+ALTER TABLE accounts DROP COLUMN IF EXISTS address;
+ALTER TABLE accounts DROP COLUMN IF EXISTS photo_url;
