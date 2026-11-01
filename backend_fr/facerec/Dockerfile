@@ -41,7 +41,7 @@ CMD ["air", "-c", ".air.toml"]
 
 
 # Stage 3: Runtime
-FROM alpine:latest
+FROM alpine:latest AS runtime
 
 WORKDIR /app
 

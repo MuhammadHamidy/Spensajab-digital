@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   # Network internal terisolasi khusus spensajab (DB & Redis aman)
   spensajab_internal:
@@ -84,7 +82,6 @@ services:
     build:
       context: ./backend_fr
       dockerfile: facerec/Dockerfile
-      target: Runtime
     container_name: spensajab-backend
     restart: always
     environment:
