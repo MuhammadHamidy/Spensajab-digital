@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' ? '/api' : 'http://spensajab-backend:8080/api');
 
 async function fetchJson(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;

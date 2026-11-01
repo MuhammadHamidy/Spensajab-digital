@@ -42,6 +42,8 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 RUN npx --yes prisma generate
 
 # Build
+ENV NEXT_PUBLIC_API_URL=/api
+ENV NEXT_PUBLIC_API_BASE_URL=/api
 RUN npm run build
 
 ################################################################################
