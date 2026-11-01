@@ -9,6 +9,7 @@ RUN apk add --no-cache git
 COPY framework/ ./framework/
 COPY libraries/ ./libraries/
 COPY facerec/ ./facerec/
+RUN if [ ! -f /build/facerec/config/config.json ]; then cp /build/facerec/config/config.example.json /build/facerec/config/config.json; fi
 
 WORKDIR /build/facerec
 
@@ -51,6 +52,7 @@ RUN addgroup -g 1000 facerec && adduser -D -u 1000 -G facerec facerec
 
 COPY --from=builder /build/facerec/facerec .
 COPY --from=builder /build/facerec/config ./config
+RUN if [ ! -f ./config/config.json ]; then cp ./config/config.example.json ./config/config.json; fi
 COPY --from=builder /build/facerec/migrations ./migrations
 COPY --from=builder /build/facerec/seeders ./seeders
 
