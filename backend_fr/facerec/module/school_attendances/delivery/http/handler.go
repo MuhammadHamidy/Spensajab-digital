@@ -213,7 +213,9 @@ func (h *SchoolAttendanceHandler) GetClasses(c *fiber.Ctx) error {
 				filtered = append(filtered, item)
 			}
 		}
-		list = filtered
+		if len(filtered) > 0 {
+			list = filtered
+		}
 	}
 	return c.Status(http.StatusOK).JSON(responses.Success(list, "Daftar kelas berhasil dimuat"))
 }

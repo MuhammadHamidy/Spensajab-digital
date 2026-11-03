@@ -6,16 +6,49 @@ import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiA
 
 export default function AttendanceRekapPage() {
   const today = new Date();
-  const formatDate = (date) => date.toISOString().slice(0, 10);
+  const formatDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = formatDate(today);
   const [filterTingkat, setFilterTingkat] = useState('ALL');
   const [filterKelas, setFilterKelas] = useState('ALL');
-  const [startDate, setStartDate] = useState(formatDate(new Date(today.getFullYear(), today.getMonth(), 1)));
-  const [endDate, setEndDate] = useState(formatDate(today));
+  const [filterKategori, setFilterKategori] = useState('ALL'); // 'ALL' | 'TIDAK_HADIR' | 'SAKIT' | 'IZIN' | 'ALPHA'
+  const [periodPreset, setPeriodPreset] = useState('TODAY'); // 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH' | 'CUSTOM'
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(todayStr);
   const [search, setSearch] = useState('');
   const [classes, setClasses] = useState([]);
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const applyPeriodPreset = (preset) => {
+    const now = new Date();
+    setPeriodPreset(preset);
+    if (preset === 'TODAY') {
+      const d = formatDate(now);
+      setStartDate(d);
+      setEndDate(d);
+    } else if (preset === 'YESTERDAY') {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      const d = formatDate(y);
+      setStartDate(d);
+      setEndDate(d);
+    } else if (preset === 'WEEK') {
+      const w = new Date(now);
+      w.setDate(now.getDate() - 6);
+      setStartDate(formatDate(w));
+      setEndDate(formatDate(now));
+    } else if (preset === 'MONTH') {
+      const m = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(formatDate(m));
+      setEndDate(formatDate(now));
+    }
+  };
 
   useEffect(() => {
     classApiAdapter.getAll().then(setClasses).catch((err) => setError(err.message));
@@ -57,9 +90,35 @@ export default function AttendanceRekapPage() {
     .map((item) => item.class_code)
     .filter(Boolean), [classes, filterTingkat]);
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((item) => {
+      if (filterKategori === 'TIDAK_HADIR') {
+        return (item.sakit_count || 0) + (item.izin_count || 0) + (item.alpha_count || 0) > 0;
+      }
+      if (filterKategori === 'SAKIT') return (item.sakit_count || 0) > 0;
+      if (filterKategori === 'IZIN') return (item.izin_count || 0) > 0;
+      if (filterKategori === 'ALPHA') return (item.alpha_count || 0) > 0;
+      return true;
+    });
+  }, [rows, filterKategori]);
+
+  const recapTotals = useMemo(() => {
+    return rows.reduce(
+      (acc, item) => {
+        acc.hadir += Number(item.hadir_count || 0);
+        acc.late += Number(item.late_count || 0);
+        acc.sakit += Number(item.sakit_count || 0);
+        acc.izin += Number(item.izin_count || 0);
+        acc.alpha += Number(item.alpha_count || 0);
+        return acc;
+      },
+      { hadir: 0, late: 0, sakit: 0, izin: 0, alpha: 0 }
+    );
+  }, [rows]);
+
   const handleExportExcel = () => {
     const header = ['NISN', 'Nama', 'Kelas', 'Total Sesi', 'Hadir', 'Telat', 'Sakit', 'Izin', 'Alpha', 'Persentase'];
-    const lines = rows.map((item) => [
+    const lines = filteredRows.map((item) => [
       item.nisn,
       item.name,
       item.class_name,
@@ -103,6 +162,79 @@ export default function AttendanceRekapPage() {
           </svg>
           <span>Unduh Rekap (.csv)</span>
         </button>
+      </div>
+
+      {/* Mode Periode Cepat (Rekap Harian / Mingguan / Bulanan) */}
+      <div className="bg-white border border-slate-200/90 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-slate-700 mr-1">Mode Laporan:</span>
+          {[
+            { id: 'TODAY', label: 'Hari Ini (Rekap Harian)' },
+            { id: 'YESTERDAY', label: 'Kemarin' },
+            { id: 'WEEK', label: '7 Hari Terakhir' },
+            { id: 'MONTH', label: 'Bulan Ini' },
+          ].map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyPeriodPreset(preset.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                periodPreset === preset.id
+                  ? 'bg-[#1E4DBD] text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { id: 'ALL', label: 'Semua Siswa' },
+            { id: 'TIDAK_HADIR', label: 'Sakit / Izin / Alpha' },
+            { id: 'SAKIT', label: 'Sakit' },
+            { id: 'IZIN', label: 'Izin' },
+            { id: 'ALPHA', label: 'Alpha' },
+          ].map((kat) => (
+            <button
+              key={kat.id}
+              type="button"
+              onClick={() => setFilterKategori(kat.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                filterKategori === kat.id
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {kat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Ringkasan Rekapitulasi Kehadiran (Hadir, Telat, Sakit, Izin, Alpha) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl">
+          <span className="text-[11px] font-semibold text-emerald-800 block">Total Hadir</span>
+          <span className="text-xl font-bold text-emerald-700 tabular-nums">{recapTotals.hadir}</span>
+        </div>
+        <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-xl">
+          <span className="text-[11px] font-semibold text-amber-800 block">Total Terlambat</span>
+          <span className="text-xl font-bold text-amber-700 tabular-nums">{recapTotals.late}</span>
+        </div>
+        <div className="bg-sky-50/70 border border-sky-200 p-3.5 rounded-xl">
+          <span className="text-[11px] font-semibold text-sky-800 block">Total Sakit</span>
+          <span className="text-xl font-bold text-sky-700 tabular-nums">{recapTotals.sakit}</span>
+        </div>
+        <div className="bg-indigo-50/70 border border-indigo-200 p-3.5 rounded-xl">
+          <span className="text-[11px] font-semibold text-indigo-800 block">Total Izin</span>
+          <span className="text-xl font-bold text-indigo-700 tabular-nums">{recapTotals.izin}</span>
+        </div>
+        <div className="bg-rose-50/70 border border-rose-200 p-3.5 rounded-xl col-span-2 sm:col-span-1">
+          <span className="text-[11px] font-semibold text-rose-800 block">Total Alpha</span>
+          <span className="text-xl font-bold text-rose-700 tabular-nums">{recapTotals.alpha}</span>
+        </div>
       </div>
 
       {/* Filter Controls Toolbar */}
@@ -151,7 +283,10 @@ export default function AttendanceRekapPage() {
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              setPeriodPreset('CUSTOM');
+              setStartDate(e.target.value);
+            }}
             className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
           />
         </div>
@@ -163,7 +298,10 @@ export default function AttendanceRekapPage() {
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => {
+              setPeriodPreset('CUSTOM');
+              setEndDate(e.target.value);
+            }}
             className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
           />
         </div>
@@ -205,9 +343,9 @@ export default function AttendanceRekapPage() {
                 <tr><td colSpan="10" className="py-8 text-center text-slate-500">Memuat rekap presensi...</td></tr>
               ) : error ? (
                 <tr><td colSpan="10" className="py-8 text-center text-rose-600" role="alert">{error}</td></tr>
-              ) : rows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr><td colSpan="10" className="py-8 text-center text-slate-500">Tidak ada data presensi pada filter ini.</td></tr>
-              ) : rows.map((item) => (
+              ) : filteredRows.map((item) => (
                 <tr key={item.student_id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3 px-4 tabular-nums font-mono text-slate-500">{item.nisn}</td>
                   <td className="py-3 px-4 font-bold text-slate-900">{item.name}</td>

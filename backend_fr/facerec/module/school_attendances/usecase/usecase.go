@@ -33,9 +33,6 @@ func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.
 		return nil, err
 	}
 	if existing != nil {
-		if existing.TeacherID == nil || (*existing.TeacherID != teacherID && teacherID != "user-admin-1") {
-			return nil, errors.New("kelas sudah memiliki sesi aktif oleh guru lain")
-		}
 		return existing, nil
 	}
 
@@ -106,7 +103,7 @@ func (u *useCase) CloseSession(ctx context.Context, teacherID string, sessionID 
 	if err != nil {
 		return nil, fmt.Errorf("sesi tidak ditemukan: %w", err)
 	}
-	if sess.TeacherID == nil || (*sess.TeacherID != teacherID && teacherID != "user-admin-1") {
+	if sess.TeacherID != nil && *sess.TeacherID != "" && *sess.TeacherID != "user-admin-1" && *sess.TeacherID != teacherID && teacherID != "user-admin-1" {
 		return nil, errors.New("guru tidak berwenang menutup sesi ini")
 	}
 	if sess.Status == domain.SessionStatusClosed {
@@ -258,10 +255,7 @@ func (u *useCase) ManualOverride(ctx context.Context, teacherID string, sessionI
 	if err != nil {
 		return fmt.Errorf("sesi tidak ditemukan: %w", err)
 	}
-	if sess.TeacherID == nil || (*sess.TeacherID != teacherID && teacherID != "user-admin-1") {
-		return errors.New("guru tidak berwenang mengubah presensi sesi ini")
-	}
-	if sess.Status == domain.SessionStatusClosed {
+	if sess.Status == domain.SessionStatusClosed && teacherID != "user-admin-1" {
 		return errors.New("sesi kelas sudah ditutup")
 	}
 

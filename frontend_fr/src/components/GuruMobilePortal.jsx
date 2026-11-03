@@ -72,8 +72,13 @@ export default function GuruMobilePortal({ user, onLogout }) {
   const [filterRosterStatus, setFilterRosterStatus] = useState('ALL');
 
   const fetchAssignedClasses = useCallback(async () => {
-    if (!user?.id) return;
-    const rawList = await classApiAdapter.getAll({ dosenId: user.id });
+    let rawList = [];
+    if (user?.id) {
+      rawList = await classApiAdapter.getAll({ dosenId: user.id });
+    }
+    if (!Array.isArray(rawList) || rawList.length === 0) {
+      rawList = await classApiAdapter.getAll();
+    }
     const list = Array.isArray(rawList) ? rawList : [];
     const hasScheduledSibling = new Set(
       list
@@ -318,28 +323,47 @@ export default function GuruMobilePortal({ user, onLogout }) {
     }
   };
 
-  // 8. Edit Kehadiran Manual (Override)
-  const handleSaveOverride = async () => {
-    if (!selectedStudentForOverride || !selectedSessionId) return;
+  // 8. Edit Kehadiran Manual (Override & Quick Sakit/Izin)
+  const handleQuickStatusChange = async (student, targetStatus) => {
+    const targetSessId = activeSession?.id || selectedSessionId;
+    if (!student || !targetSessId) return;
     setIsSubmitting(true);
-    await attendanceApi.manualOverride(
-      selectedSessionId,
+    const res = await attendanceApi.manualOverride(
+      targetSessId,
+      student.student_id,
+      targetStatus,
+      student.notes || ''
+    );
+    setIsSubmitting(false);
+
+    if (res.success !== false) {
+      await fetchSelectedSessionDetail(targetSessId);
+      await fetchSessionsList();
+    } else {
+      alert(res.error?.message || res.message || 'Gagal memperbarui status kehadiran siswa');
+    }
+  };
+
+  const handleSaveOverride = async () => {
+    const targetSessId = selectedSessionId || activeSession?.id;
+    if (!selectedStudentForOverride || !targetSessId) return;
+    setIsSubmitting(true);
+    const res = await attendanceApi.manualOverride(
+      targetSessId,
       selectedStudentForOverride.student_id,
       overrideStatus,
       overrideNotes
     );
     setIsSubmitting(false);
 
-    // Update local roster
-    setAttendances((prev) =>
-      prev.map((item) =>
-        item.id === selectedStudentForOverride.id || item.student_id === selectedStudentForOverride.student_id
-          ? { ...item, status: overrideStatus, notes: overrideNotes }
-          : item
-      )
-    );
-    setIsOverrideModalOpen(false);
-    setSelectedStudentForOverride(null);
+    if (res.success !== false) {
+      await fetchSelectedSessionDetail(targetSessId);
+      await fetchSessionsList();
+      setIsOverrideModalOpen(false);
+      setSelectedStudentForOverride(null);
+    } else {
+      alert(res.error?.message || res.message || 'Gagal menyimpan perubahan kehadiran');
+    }
   };
 
   // Filter roster list
@@ -460,15 +484,13 @@ export default function GuruMobilePortal({ user, onLogout }) {
                     Buka sesi presensi sebelum memulai jam pelajaran.
                   </p>
                 </div>
-                {assignedClasses.length > 0 && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setIsOpenClassModalOpen(true)}
-                  >
-                    Buka Kelas
-                  </Button>
-                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsOpenClassModalOpen(true)}
+                >
+                  Buka Kelas
+                </Button>
               </div>
             )}
 
@@ -604,13 +626,21 @@ export default function GuruMobilePortal({ user, onLogout }) {
                 </strong>
               </div>
 
-              {activeSession && (
+              {activeSession ? (
                 <div className="text-right tabular-nums">
                   <span className="text-[#64748B]">Sisa Waktu: </span>
                   <strong className={isCutoffPassed ? 'text-[#BE123C]' : 'text-[#B45309]'}>
                     {remainingTime}
                   </strong>
                 </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsOpenClassModalOpen(true)}
+                >
+                  + Buka Kelas
+                </Button>
               )}
             </div>
 
@@ -662,14 +692,104 @@ export default function GuruMobilePortal({ user, onLogout }) {
               )}
             </div>
 
+            {/* Daftar Siswa Cepat untuk Set Sakit / Izin saat Sesi Kelas Dibuka */}
+            {activeSession && (
+              <div className="bg-white border border-[#E2E8F0] rounded-[10px] overflow-hidden">
+                <div className="p-3 bg-[#F8FAFC] border-b border-[#E2E8F0] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[#0F172A]">
+                      Edit Cepat Siswa Sakit / Izin (Kelas {activeSession.class_name})
+                    </span>
+                    <span className="text-[11px] text-[#64748B] tabular-nums">
+                      {roster.length} Siswa
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Cari nama siswa yang sakit atau izin..."
+                    value={searchRoster}
+                    onChange={(e) => setSearchRoster(e.target.value)}
+                    className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+                  />
+                </div>
+                <div className="divide-y divide-[#E2E8F0] max-h-[260px] overflow-y-auto">
+                  {filteredRoster.length > 0 ? (
+                    filteredRoster.map((st, idx) => (
+                      <div
+                        key={st.id || st.student_id || idx}
+                        className="p-2.5 px-3 flex items-center justify-between gap-2 hover:bg-[#F8FAFC]"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#0F172A] truncate">
+                            {idx + 1}. {st.student_name}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <AttendanceBadge status={st.status} size="sm" />
+                            {st.notes && (
+                              <span className="text-[10px] text-[#0369A1] truncate">
+                                ({st.notes})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickStatusChange(st, 'SAKIT')}
+                            className={`px-2 py-1 rounded-[4px] border text-[11px] font-semibold cursor-pointer transition-colors ${
+                              st.status === 'SAKIT'
+                                ? 'bg-[#0284C7] border-[#0284C7] text-white'
+                                : 'bg-[#F0F9FF] border-[#BAE6FD] text-[#0369A1] hover:bg-[#E0F2FE]'
+                            }`}
+                          >
+                            Sakit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickStatusChange(st, 'IZIN')}
+                            className={`px-2 py-1 rounded-[4px] border text-[11px] font-semibold cursor-pointer transition-colors ${
+                              st.status === 'IZIN'
+                                ? 'bg-[#4F46E5] border-[#4F46E5] text-white'
+                                : 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4338CA] hover:bg-[#E0E7FF]'
+                            }`}
+                          >
+                            Izin
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudentForOverride(st);
+                              setOverrideStatus(st.status === 'PENDING' ? 'SAKIT' : st.status);
+                              setOverrideNotes(st.notes || '');
+                              setIsOverrideModalOpen(true);
+                            }}
+                            className="px-2 py-1 rounded-[4px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-[11px] font-semibold text-[#0F172A] cursor-pointer"
+                          >
+                            Detail
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-xs text-[#64748B]">
+                      Tidak ada siswa ditemukan.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Navigasi Cepat ke Kelola Absensi */}
             <Button
               variant="secondary"
               size="md"
               className="w-full"
-              onClick={() => setActiveTab('absensi')}
+              onClick={() => {
+                if (activeSession) setSelectedSessionId(activeSession.id);
+                setActiveTab('absensi');
+              }}
             >
-              Lihat & Kelola Daftar Absensi Kelas
+              Lihat & Kelola Daftar Absensi Kelas Lengkap
             </Button>
           </div>
         )}
@@ -803,13 +923,35 @@ export default function GuruMobilePortal({ user, onLogout }) {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                         <AttendanceBadge status={st.status} size="sm" />
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(st, 'SAKIT')}
+                          className={`px-2 py-1 rounded-[4px] border text-[11px] font-semibold cursor-pointer transition-colors ${
+                            st.status === 'SAKIT'
+                              ? 'bg-[#0284C7] border-[#0284C7] text-white'
+                              : 'bg-[#F0F9FF] border-[#BAE6FD] text-[#0369A1] hover:bg-[#E0F2FE]'
+                          }`}
+                        >
+                          Sakit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusChange(st, 'IZIN')}
+                          className={`px-2 py-1 rounded-[4px] border text-[11px] font-semibold cursor-pointer transition-colors ${
+                            st.status === 'IZIN'
+                              ? 'bg-[#4F46E5] border-[#4F46E5] text-white'
+                              : 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4338CA] hover:bg-[#E0E7FF]'
+                          }`}
+                        >
+                          Izin
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedStudentForOverride(st);
-                            setOverrideStatus(st.status === 'PENDING' ? 'HADIR' : st.status);
+                            setOverrideStatus(st.status === 'PENDING' ? 'SAKIT' : st.status);
                             setOverrideNotes(st.notes || '');
                             setIsOverrideModalOpen(true);
                           }}

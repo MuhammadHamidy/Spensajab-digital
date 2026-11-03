@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/features/auth/presentation/useAuth';
 
-export default function Navbar() {
-  const { user, logout } = useAuth();
+export default function Navbar({ onToggleSidebar }) {
+  const { user } = useAuth();
   const pathname = usePathname();
   const [currentDateStr, setCurrentDateStr] = useState('');
 
@@ -46,15 +46,26 @@ export default function Navbar() {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs">
-      {/* Left: Breadcrumbs & Page Info */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors font-medium">
+    <header className="h-14 sm:h-16 bg-white border-b border-slate-200 px-3.5 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs print:hidden">
+      {/* Left: Hamburger Button (Mobile) & Breadcrumbs */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Buka menu navigasi"
+          className="lg:hidden p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 shrink-0 cursor-pointer"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 min-w-0 truncate">
+          <Link href="/" className="hover:text-blue-600 transition-colors font-medium hidden sm:inline">
             {breadcrumb.section}
           </Link>
-          <span className="text-slate-300">/</span>
-          <span className="text-slate-900 font-semibold">{breadcrumb.sub}</span>
+          <span className="text-slate-300 hidden sm:inline">/</span>
+          <span className="text-slate-900 font-semibold truncate">{breadcrumb.sub}</span>
         </div>
       </div>
 

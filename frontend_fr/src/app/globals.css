@@ -143,64 +143,61 @@ body {
     margin: 10mm;
   }
 
-  body * {
-    visibility: hidden !important;
-  }
-
-  .students-print-page,
-  .students-print-page * {
-    visibility: visible !important;
-  }
-
+  html,
+  body,
+  main,
   .students-print-page {
-    position: absolute !important;
-    inset: 0 !important;
+    display: block !important;
+    position: static !important;
     width: 100% !important;
     max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
   }
 
-  .students-print-page > .grid {
+  .students-print-grid {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 8mm !important;
+    gap: 6mm !important;
+    width: 100% !important;
   }
 
   .student-qr-card {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    min-height: 78mm;
-    padding: 5mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    min-height: 76mm;
+    padding: 4mm !important;
     border: 1px solid #111827 !important;
     border-radius: 3mm !important;
+    background: #ffffff !important;
   }
 
   .student-card-logo,
-  .student-card-school,
-  .student-card-nisn,
-  .student-card-class,
   .student-card-token {
     display: none !important;
   }
 
   .print-card-header {
     justify-content: center !important;
-    border-bottom: 0 !important;
-    padding-bottom: 0 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding-bottom: 2mm !important;
   }
 
   .print-card-header > div {
     width: 100%;
     justify-content: center;
+    text-align: center;
   }
 
   .print-card-header h3 {
     max-width: none !important;
     width: 100%;
-    min-height: 9mm;
     text-align: center;
-    font-size: 12pt !important;
+    font-size: 10.5pt !important;
     line-height: 1.25 !important;
     white-space: normal !important;
     overflow: visible !important;
@@ -216,7 +213,7 @@ body {
   }
 
   .student-qr-card > div:nth-child(2) img {
-    width: 48mm !important;
-    height: 48mm !important;
+    width: 44mm !important;
+    height: 44mm !important;
   }
 }

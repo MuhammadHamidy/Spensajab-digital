@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/features/auth/presentation/useAuth';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -124,110 +124,137 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white text-slate-800 flex flex-col justify-between min-h-screen sticky top-0 shrink-0 select-none z-30 border-r border-slate-200 shadow-sm">
-      {/* Top Header Branding dengan Logo Resmi */}
-      <div className="overflow-y-auto flex-1">
-        <div className="px-4 py-3.5 border-b border-slate-100 flex items-center gap-3 bg-gradient-to-r from-blue-50/50 to-white">
-          <div className="w-10 h-10 rounded-lg bg-white p-1 shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
-            <Image
-              src="/image/logo-jabon.png"
-              alt="Logo SMP Negeri 1 Jabon"
-              width={36}
-              height={36}
-              className="object-contain w-full h-full"
-              priority
-            />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[#193D9B] font-bold text-sm tracking-tight leading-tight truncate">
-              SMPN 1 JABON
-            </h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#EAB308]"></span>
-              <p className="text-[11px] font-semibold text-slate-600 truncate">
-                Presensi Siswa QR
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Sections */}
-        <nav className="p-3 space-y-4">
-          {menuSections.map((sec, idx) => (
-            <div key={idx}>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                {sec.section}
-              </p>
-              <div className="space-y-0.5">
-                {sec.items.map((item) => {
-                  const active = isCurrentActive(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
-                        active
-                          ? 'bg-[#1E4DBD] text-white font-semibold shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className={`shrink-0 transition-colors ${
-                            active ? 'text-white' : 'text-slate-400 group-hover:text-[#1E4DBD]'
-                          }`}
-                        >
-                          {item.icon}
-                        </span>
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${
-                            active
-                              ? 'bg-white/20 text-white border-white/30'
-                              : item.badgeColor || 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-[1px] z-40 lg:hidden print:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white text-slate-800 flex flex-col justify-between min-h-screen shrink-0 select-none border-r border-slate-200 shadow-lg lg:shadow-sm transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:sticky lg:top-0 lg:z-30 print:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Top Header Branding dengan Logo Resmi */}
+        <div className="overflow-y-auto flex-1">
+          <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 bg-gradient-to-r from-blue-50/50 to-white">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-lg bg-white p-1 shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
+                <Image
+                  src="/image/logo-jabon.png"
+                  alt="Logo SMP Negeri 1 Jabon"
+                  width={36}
+                  height={36}
+                  className="object-contain w-full h-full"
+                  priority
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-[#193D9B] font-bold text-sm tracking-tight leading-tight truncate">
+                  SMPN 1 JABON
+                </h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#EAB308]"></span>
+                  <p className="text-[11px] font-semibold text-slate-600 truncate">
+                    Presensi Siswa QR
+                  </p>
+                </div>
               </div>
             </div>
-          ))}
-        </nav>
-      </div>
 
-      {/* User Info & Logout Footer */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50/70 space-y-2">
-        <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-xs flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
-            {(user?.fullName || user?.name || 'Admin').slice(0, 2).toUpperCase()}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Tutup menu"
+              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-slate-800 truncate">
-              {user?.fullName || user?.name || 'Administrator'}
-            </p>
-            <p className="text-[11px] text-slate-500 truncate">
-              {user?.roleName || 'Admin Sekolah'}
-            </p>
-          </div>
+
+          {/* Navigation Sections */}
+          <nav className="p-3 space-y-4">
+            {menuSections.map((sec, idx) => (
+              <div key={idx}>
+                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  {sec.section}
+                </p>
+                <div className="space-y-0.5">
+                  {sec.items.map((item) => {
+                    const active = isCurrentActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => onClose?.()}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
+                          active
+                            ? 'bg-[#1E4DBD] text-white font-semibold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`shrink-0 transition-colors ${
+                              active ? 'text-white' : 'text-slate-400 group-hover:text-[#1E4DBD]'
+                            }`}
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${
+                              active
+                                ? 'bg-white/20 text-white border-white/30'
+                                : item.badgeColor || 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
         </div>
 
-        <button
-          type="button"
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span>Keluar Akun</span>
-        </button>
-      </div>
-    </aside>
+        {/* User Info & Logout Footer */}
+        <div className="p-3 border-t border-slate-200 bg-slate-50/70 space-y-2">
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-xs flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-md bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
+              {(user?.fullName || user?.name || 'Admin').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-800 truncate">
+                {user?.fullName || user?.name || 'Administrator'}
+              </p>
+              <p className="text-[11px] text-slate-500 truncate">
+                {user?.roleName || 'Admin Sekolah'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Keluar Akun</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

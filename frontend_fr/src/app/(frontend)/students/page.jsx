@@ -194,12 +194,19 @@ export default function StudentsQRManagementPage() {
           <button
             type="button"
             onClick={handlePrint}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+            disabled={filtered.length === 0}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
-            <span>Cetak Lembar Kartu (Print PDF)</span>
+            <span>
+              Cetak Kartu QR (
+              {selectedClass === 'ALL'
+                ? `Semua Kelas: ${filtered.length} Siswa`
+                : `Kelas ${selectedClass}: ${filtered.length} Siswa`}
+              )
+            </span>
           </button>
         </div>
       </div>
@@ -289,14 +296,15 @@ export default function StudentsQRManagementPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-2 print:gap-4">
+          {/* Tampilan Layar (Ter-paging) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:hidden">
             {paginatedStudents.map((student) => (
               <div
                 key={student.id}
-                className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all print:border-black print:text-black print:rounded-lg print:shadow-none"
+                className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all"
               >
                 {/* Header Kartu dengan Logo Resmi */}
-                <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3 print:border-gray-300">
+                <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2.5">
                     <div className="student-card-logo w-9 h-9 rounded-lg bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0">
                       <Image
@@ -308,25 +316,25 @@ export default function StudentsQRManagementPage() {
                       />
                     </div>
                     <div>
-                      <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block print:text-black">
+                      <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block">
                         SMP NEGERI 1 JABON
                       </span>
-                      <h3 className="text-sm font-bold text-slate-900 print:text-black leading-tight truncate max-w-[170px]">
+                      <h3 className="text-sm font-bold text-slate-900 leading-tight truncate max-w-[170px]">
                         {student.name}
                       </h3>
-                      <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums print:text-gray-700">
+                      <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums">
                         NISN: {student.nisn}
                       </p>
                     </div>
                   </div>
 
-                  <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold print:border-black print:bg-white print:text-black">
+                  <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
                     {student.className}
                   </span>
                 </div>
 
                 {/* Area QR Code */}
-                <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
+                <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
@@ -336,13 +344,13 @@ export default function StudentsQRManagementPage() {
                       e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
                     }}
                   />
-                  <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums print:text-black">
+                  <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums">
                     Token: {student.qrToken.slice(0, 18)}...
                   </span>
                 </div>
 
                 {/* Footer Kartu */}
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 print:hidden">
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
                   <span className="text-slate-500 font-medium">{student.gender}</span>
                   <div className="flex items-center gap-3">
                     <button
@@ -360,6 +368,43 @@ export default function StudentsQRManagementPage() {
                       Detail Token →
                     </button>
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tampilan Cetak PDF (Mencetak SELURUH Siswa Sesuai Filter Kelas / Semua Kelas di Banyak Lembar A4) */}
+          <div className="students-print-grid hidden print:grid">
+            {filtered.map((student) => (
+              <div
+                key={`print-${student.id}`}
+                className="student-qr-card bg-white border border-black rounded-lg p-3 flex flex-col justify-between gap-2 text-black"
+              >
+                <div className="print-card-header border-b border-gray-300 pb-2 text-center">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider block text-black">
+                      SMP NEGERI 1 JABON • KELAS {student.className}
+                    </span>
+                    <h3 className="text-xs font-bold text-black leading-snug mt-0.5">
+                      {student.name}
+                    </h3>
+                    <p className="text-[10px] text-gray-700 tabular-nums">
+                      NISN: {student.nisn}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center p-1 bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
+                    alt={`QR ${student.name}`}
+                    loading="eager"
+                    className="w-36 h-36 object-contain"
+                    onError={(e) => {
+                      e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
+                    }}
+                  />
                 </div>
               </div>
             ))}

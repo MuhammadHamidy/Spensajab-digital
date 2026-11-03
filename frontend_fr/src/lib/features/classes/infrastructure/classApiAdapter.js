@@ -21,17 +21,17 @@ export const classApiAdapter = {
       const res = await httpClient.get(`/school/classes${query}`);
       let list = Array.isArray(res.data) ? res.data : (res.data?.classes || []);
 
-      // Client-side strict filter: If logged-in user is a GURU, ensure they only see their assigned classes!
       if (currentUser && (currentUser.roleName === 'GURU' || currentUser.roleName === 'DOSEN') && !dosenId) {
         const allowedCodes = currentUser.class_codes || currentUser.classCodes || [];
         const allowedIds = currentUser.class_ids || currentUser.classIds || [];
-        if (allowedCodes.length > 0 || allowedIds.length > 0) {
-          list = list.filter((c) => {
-            if (c.dosen_id === currentUser.id) return true;
-            if (allowedCodes.includes(c.class_code)) return true;
-            if (allowedIds.includes(c.id)) return true;
-            return false;
-          });
+        const matched = list.filter((c) => {
+          if (c.dosen_id === currentUser.id || c.teacher_id === currentUser.id) return true;
+          if (allowedCodes.includes(c.class_code)) return true;
+          if (allowedIds.includes(c.id)) return true;
+          return false;
+        });
+        if (matched.length > 0) {
+          list = matched;
         }
       }
 

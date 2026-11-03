@@ -13,11 +13,21 @@ export default function MainPage() {
   const [adminViewMode, setAdminViewMode] = useState('admin'); // 'admin' | 'guru_preview'
 
   // Admin Dashboard state
+  const formatLocalDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const [liveSessions, setLiveSessions] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [studentCount, setStudentCount] = useState(0);
   const [teacherCount, setTeacherCount] = useState(0);
   const [currentTime, setCurrentTime] = useState('');
+  const [dailyReportDate, setDailyReportDate] = useState(() => formatLocalDate(new Date()));
+  const [dailyReportRows, setDailyReportRows] = useState([]);
+  const [dailyReportFilter, setDailyReportFilter] = useState('KETIDAKHADIRAN'); // 'KETIDAKHADIRAN' | 'SAKIT' | 'IZIN' | 'ALPHA' | 'ALL'
+  const [isLoadingDailyReport, setIsLoadingDailyReport] = useState(false);
 
   // Live time ticker
   useEffect(() => {
@@ -64,6 +74,67 @@ export default function MainPage() {
     }
     loadData();
   }, [isAuthenticated, user]);
+
+  // Load daily attendance recap (Sakit, Izin, Alpha) for selected date
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const role = (user.roleName || '').toUpperCase();
+    if (!role.includes('ADMIN')) return;
+
+    let active = true;
+    setIsLoadingDailyReport(true);
+    attendanceApi
+      .getAttendanceReport({
+        start_date: dailyReportDate,
+        end_date: dailyReportDate,
+      })
+      .then((res) => {
+        if (!active) return;
+        if (res.success && Array.isArray(res.data)) {
+          setDailyReportRows(res.data);
+        } else {
+          setDailyReportRows([]);
+        }
+      })
+      .catch(() => {
+        if (active) setDailyReportRows([]);
+      })
+      .finally(() => {
+        if (active) setIsLoadingDailyReport(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, user, dailyReportDate]);
+
+  const dailySummary = dailyReportRows.reduce(
+    (acc, item) => {
+      acc.hadir += Number(item.hadir_count || 0);
+      acc.late += Number(item.late_count || 0);
+      acc.sakit += Number(item.sakit_count || 0);
+      acc.izin += Number(item.izin_count || 0);
+      acc.alpha += Number(item.alpha_count || 0);
+      acc.meetings += Number(item.total_meetings || 0);
+      return acc;
+    },
+    { hadir: 0, late: 0, sakit: 0, izin: 0, alpha: 0, meetings: 0 }
+  );
+
+  const dailyAttendanceRate =
+    dailySummary.meetings > 0
+      ? Math.round(((dailySummary.hadir + dailySummary.late) / dailySummary.meetings) * 100)
+      : null;
+
+  const filteredDailyReportRows = dailyReportRows.filter((item) => {
+    if (dailyReportFilter === 'KETIDAKHADIRAN') {
+      return (item.sakit_count || 0) + (item.izin_count || 0) + (item.alpha_count || 0) > 0;
+    }
+    if (dailyReportFilter === 'SAKIT') return (item.sakit_count || 0) > 0;
+    if (dailyReportFilter === 'IZIN') return (item.izin_count || 0) > 0;
+    if (dailyReportFilter === 'ALPHA') return (item.alpha_count || 0) > 0;
+    return (item.total_meetings || 0) > 0;
+  });
 
   // 1. Loading state
   if (authLoading || !isAuthenticated || !user) {
@@ -310,17 +381,171 @@ export default function MainPage() {
 
         <div className="bg-white border border-slate-200/90 p-5 rounded-2xl shadow-xs hover:border-[#EAB308] transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Tingkat Kehadiran</span>
+            <span className="text-xs font-semibold text-slate-500">Rekap Harian ({dailyReportDate})</span>
             <span className="p-2 rounded-lg bg-[#FEF9C3] text-[#CA8A04]">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">-</p>
-          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-500">
-            <span className="text-slate-500 font-semibold">Belum ada data</span>
-            <span>• Rata-rata semester</span>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
+            {dailyAttendanceRate !== null ? `${dailyAttendanceRate}% Hadir` : 'Belum Ada Sesi'}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] text-slate-500 tabular-nums">
+            <span className="text-sky-700 font-semibold">Sakit: {dailySummary.sakit}</span>
+            <span>•</span>
+            <span className="text-indigo-700 font-semibold">Izin: {dailySummary.izin}</span>
+            <span>•</span>
+            <span className="text-rose-700 font-semibold">Alpha: {dailySummary.alpha}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3B. Laporan Rekap Kehadiran Harian (Sakit, Izin, Alpha) */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                Laporan Rekap Kehadiran Harian (Sakit, Izin & Alpha)
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E4DBD] border border-blue-200 text-[10px] font-bold">
+                Otomatis Setiap Hari
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Rekapitulasi kehadiran siswa harian dari seluruh sesi kelas yang dibuka oleh Guru maupun Admin.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={dailyReportDate}
+              onChange={(e) => setDailyReportDate(e.target.value)}
+              className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            />
+            <button
+              type="button"
+              onClick={() => setDailyReportDate(formatLocalDate(new Date()))}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+            >
+              Hari Ini
+            </button>
+            <Link
+              href="/admin/rekap"
+              className="px-3 py-1.5 rounded-lg bg-[#1E4DBD] hover:bg-[#193D9B] text-white text-xs font-semibold transition-colors"
+            >
+              Buka Rekap Lengkap →
+            </Link>
+          </div>
+        </div>
+
+        {/* 5 Kotak Ringkasan Harian */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-xl">
+            <span className="text-[11px] font-semibold text-emerald-800 block">Hadir Tepat Waktu</span>
+            <span className="text-lg font-bold text-emerald-700 tabular-nums">{dailySummary.hadir}</span>
+          </div>
+          <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-xl">
+            <span className="text-[11px] font-semibold text-amber-800 block">Terlambat</span>
+            <span className="text-lg font-bold text-amber-700 tabular-nums">{dailySummary.late}</span>
+          </div>
+          <div className="bg-sky-50/70 border border-sky-200 p-3 rounded-xl">
+            <span className="text-[11px] font-semibold text-sky-800 block">Siswa Sakit</span>
+            <span className="text-lg font-bold text-sky-700 tabular-nums">{dailySummary.sakit}</span>
+          </div>
+          <div className="bg-indigo-50/70 border border-indigo-200 p-3 rounded-xl">
+            <span className="text-[11px] font-semibold text-indigo-800 block">Siswa Izin</span>
+            <span className="text-lg font-bold text-indigo-700 tabular-nums">{dailySummary.izin}</span>
+          </div>
+          <div className="bg-rose-50/70 border border-rose-200 p-3 rounded-xl col-span-2 sm:col-span-1">
+            <span className="text-[11px] font-semibold text-rose-800 block">Siswa Alpha</span>
+            <span className="text-lg font-bold text-rose-700 tabular-nums">{dailySummary.alpha}</span>
+          </div>
+        </div>
+
+        {/* Filter Daftar Siswa Harian */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          {[
+            { id: 'KETIDAKHADIRAN', label: 'Daftar Sakit / Izin / Alpha' },
+            { id: 'SAKIT', label: `Sakit (${dailySummary.sakit})` },
+            { id: 'IZIN', label: `Izin (${dailySummary.izin})` },
+            { id: 'ALPHA', label: `Alpha (${dailySummary.alpha})` },
+            { id: 'ALL', label: 'Semua Siswa Bersesi Hari Ini' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setDailyReportFilter(tab.id)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                dailyReportFilter === tab.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tabel Ringkas Siswa Sakit / Izin / Alpha Hari Ini */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto max-h-[300px]">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 sticky top-0">
+                <tr>
+                  <th className="py-2.5 px-3 font-semibold">NISN</th>
+                  <th className="py-2.5 px-3 font-semibold">Nama Siswa</th>
+                  <th className="py-2.5 px-3 font-semibold text-center">Kelas</th>
+                  <th className="py-2.5 px-3 font-semibold text-center text-emerald-700">Hadir</th>
+                  <th className="py-2.5 px-3 font-semibold text-center text-sky-700">Sakit</th>
+                  <th className="py-2.5 px-3 font-semibold text-center text-indigo-700">Izin</th>
+                  <th className="py-2.5 px-3 font-semibold text-center text-rose-700">Alpha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoadingDailyReport ? (
+                  <tr>
+                    <td colSpan="7" className="py-6 text-center text-slate-500">
+                      Memuat laporan rekap harian...
+                    </td>
+                  </tr>
+                ) : filteredDailyReportRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="py-6 text-center text-slate-500">
+                      {dailySummary.meetings === 0
+                        ? `Belum ada sesi kelas yang dibuka pada tanggal ${dailyReportDate}.`
+                        : 'Tidak ada siswa yang berstatus Sakit, Izin, atau Alpha pada filter ini.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDailyReportRows.map((item) => (
+                    <tr key={item.student_id} className="hover:bg-slate-50/80">
+                      <td className="py-2.5 px-3 font-mono text-slate-500 tabular-nums">{item.nisn}</td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">{item.name}</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                          {item.class_name}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-emerald-700 tabular-nums">
+                        {(item.hadir_count || 0) + (item.late_count || 0)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-sky-700 tabular-nums">
+                        {item.sakit_count || 0}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-indigo-700 tabular-nums">
+                        {item.izin_count || 0}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-rose-700 tabular-nums">
+                        {item.alpha_count || 0}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

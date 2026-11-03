@@ -89,7 +89,12 @@ func (r *repository) FindSessions(ctx context.Context, teacherID string, classID
 		var roleID string
 		_ = r.db.WithContext(ctx).Table("accounts").Select("role_id").Where("id = ?", teacherID).Scan(&roleID).Error
 		if roleID != "role-admin" {
-			q = q.Where("(class_sessions.teacher_id = ? OR classes.dosen_id = ?)", teacherID, teacherID)
+			q = q.Where(`(
+				class_sessions.teacher_id = ?
+				OR classes.dosen_id = ?
+				OR classes.id IN (SELECT class_id FROM teacher_classes WHERE account_id = ?)
+				OR class_sessions.status = ?
+			)`, teacherID, teacherID, teacherID, domain.SessionStatusOpen)
 		}
 	}
 	if classID != "" {
@@ -313,9 +318,33 @@ func (r *repository) UpdateAttendanceStatus(ctx context.Context, sessionID strin
 	if status == domain.StatusHadir || status == domain.StatusTerlambat {
 		updates["timestamp"] = now
 	}
-	return r.db.WithContext(ctx).Table("attendances").
+	res := r.db.WithContext(ctx).Table("attendances").
 		Where("session_id = ? AND student_id = ?", sessionID, studentID).
-		Updates(updates).Error
+		Updates(updates)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		var ts *time.Time
+		if status == domain.StatusHadir || status == domain.StatusTerlambat {
+			ts = &now
+		}
+		newAtt := domain.Attendance{
+			ID:           uuid.New().String(),
+			SessionID:    sessionID,
+			StudentID:    studentID,
+			Timestamp:    ts,
+			Status:       status,
+			Method:       domain.MethodManual,
+			IsManualEdit: true,
+			EditedBy:     editedBy,
+			Notes:        notes,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		return r.db.WithContext(ctx).Table("attendances").Create(&newAtt).Error
+	}
+	return nil
 }
 
 func (r *repository) GetSessionSummary(ctx context.Context, sessionID string) (*domain.SessionSummary, error) {

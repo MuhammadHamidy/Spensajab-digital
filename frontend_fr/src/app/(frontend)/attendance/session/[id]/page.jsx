@@ -232,6 +232,28 @@ export default function ClassSessionScannerPage() {
     }
   };
 
+  // Quick 1-tap Sakit / Izin override when session is open
+  const handleQuickStatusOverride = async (studentItem, nextStatus) => {
+    if (!studentItem?.student_id) return;
+    const defaultNote =
+      nextStatus === 'SAKIT'
+        ? 'Sakit (Diinput saat sesi kelas)'
+        : nextStatus === 'IZIN'
+        ? 'Izin (Diinput saat sesi kelas)'
+        : '';
+    const res = await attendanceApi.manualOverride(
+      sessionId,
+      studentItem.student_id,
+      nextStatus,
+      studentItem.notes || defaultNote
+    );
+    if (res.success) {
+      fetchSessionData();
+    } else {
+      alert(res.error?.message || `Gagal mengubah status ke ${nextStatus}`);
+    }
+  };
+
   const filteredAttendances = attendances.filter((item) => {
     const matchStatus = filterStatus === 'ALL' || item.status === filterStatus;
     const matchSearch =
@@ -446,12 +468,12 @@ export default function ClassSessionScannerPage() {
             {/* Filter & Search Bar */}
             <div className="p-3 border-b border-[#E2E8F0] flex flex-wrap items-center justify-between gap-2.5 bg-[#F8FAFC]">
               <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-                {['ALL', 'HADIR', 'TERLAMBAT', 'PENDING', 'ALPHA'].map((st) => (
+                {['ALL', 'HADIR', 'TERLAMBAT', 'SAKIT', 'IZIN', 'PENDING', 'ALPHA'].map((st) => (
                   <button
                     key={st}
                     type="button"
                     onClick={() => setFilterStatus(st)}
-                    className={`px-2.5 py-1 rounded-[6px] text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-[6px] text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                       filterStatus === st
                         ? 'bg-[#2563EB] text-white font-semibold'
                         : 'bg-white border border-[#CBD5E1] text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
@@ -519,22 +541,46 @@ export default function ClassSessionScannerPage() {
                         </span>
                       )}
 
-                      {/* Tombol Manual Attendance Override */}
+                      {/* Tombol Manual Attendance Override (Sakit / Izin / Ubah) */}
                       {isSessionOpen && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedStudentForOverride(item);
-                            setOverrideStatus(
-                              item.status === 'PENDING' ? 'HADIR' : item.status
-                            );
-                            setOverrideNotes(item.notes || '');
-                            setIsOverrideModalOpen(true);
-                          }}
-                          className="px-2 py-1 rounded-[6px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-xs font-semibold text-[#0F172A] cursor-pointer"
-                        >
-                          Ubah
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickStatusOverride(item, 'SAKIT')}
+                            className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
+                              item.status === 'SAKIT'
+                                ? 'bg-[#0284C7] border-[#0284C7] text-white'
+                                : 'bg-[#F0F9FF] border-[#BAE6FD] text-[#0369A1] hover:bg-[#E0F2FE]'
+                            }`}
+                          >
+                            Sakit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickStatusOverride(item, 'IZIN')}
+                            className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
+                              item.status === 'IZIN'
+                                ? 'bg-[#4F46E5] border-[#4F46E5] text-white'
+                                : 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4338CA] hover:bg-[#E0E7FF]'
+                            }`}
+                          >
+                            Izin
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudentForOverride(item);
+                              setOverrideStatus(
+                                item.status === 'PENDING' ? 'SAKIT' : item.status
+                              );
+                              setOverrideNotes(item.notes || '');
+                              setIsOverrideModalOpen(true);
+                            }}
+                            className="px-2 py-1 rounded-[6px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-xs font-semibold text-[#0F172A] cursor-pointer"
+                          >
+                            Ubah
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
@@ -10,6 +10,11 @@ export default function AppLayoutWrapper({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, loading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [pathname]);
 
   const isLoginPage = pathname === '/login';
   const isKioskPage = pathname === '/kiosk';
@@ -89,13 +94,15 @@ export default function AppLayoutWrapper({ children }) {
     );
   }
 
-  // 6. Layout Utama Admin: LANGSUNG MENAMPILKAN MENU DENGAN SIDEBAR & NAVBAR!
+  // 6. Layout Utama Admin: Responsif untuk Desktop & Mobile (HP)
   return (
-    <div className="min-h-screen flex bg-slate-50 text-slate-800 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        <Navbar />
-        <main className="flex-1 p-6 sm:p-8 overflow-y-auto">{children}</main>
+    <div className="min-h-screen flex bg-slate-50 text-slate-800 font-sans print:block print:bg-white">
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen print:block print:min-h-0">
+        <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-x-hidden overflow-y-auto print:p-0 print:overflow-visible">
+          {children}
+        </main>
       </div>
     </div>
   );
