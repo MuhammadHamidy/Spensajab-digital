@@ -23,7 +23,7 @@ export default function Navbar() {
 
   const getBreadcrumb = () => {
     if (pathname === '/') return { section: 'Dashboard', sub: 'Ringkasan Utama' };
-    if (pathname.includes('/attendance/session/')) return { section: 'Presensi', sub: 'Pemindai QR Kelas' };
+    if (pathname.includes('/attendance/session/')) return { section: 'Presensi', sub: 'Detail Sesi & Roster Kelas' };
     if (pathname.startsWith('/attendance/monitoring')) return { section: 'Presensi', sub: 'Monitoring Presensi' };
     if (pathname.startsWith('/attendance')) return { section: 'Presensi', sub: 'Daftar Sesi Kelas' };
     if (pathname.startsWith('/admin/import')) return { section: 'Administrasi', sub: 'Import Data' };

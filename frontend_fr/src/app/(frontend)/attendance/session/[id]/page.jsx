@@ -8,11 +8,14 @@ import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { attendanceApi } from '@/lib/attendanceApi';
 import { attendanceAudio } from '@/lib/attendanceAudio';
+import { useAuth } from '@/lib/features/auth/presentation/useAuth';
 
 export default function ClassSessionScannerPage() {
   const params = useParams();
   const sessionId = params.id;
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = (user?.roleName || '').toUpperCase().includes('ADMIN');
 
   // State Sesi
   const [session, setSession] = useState(null);
@@ -163,8 +166,9 @@ export default function ClassSessionScannerPage() {
     [sessionId, fetchSessionData]
   );
 
-  // 4. Keyboard Listener untuk USB Barcode Scanner (Global)
+  // 4. Keyboard Listener untuk USB Barcode Scanner (Global - Khusus Guru)
   useEffect(() => {
+    if (isAdmin) return undefined;
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
         return;
@@ -190,7 +194,7 @@ export default function ClassSessionScannerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleScan]);
+  }, [handleScan, isAdmin]);
 
   // 5. Tutup Sesi Kelas
   const handleConfirmCloseSession = async () => {
@@ -334,67 +338,69 @@ export default function ClassSessionScannerPage() {
         </div>
       </header>
 
-      {/* ===================== HERO MAIN SPLIT LAYOUT (45:55) ===================== */}
+      {/* ===================== HERO MAIN LAYOUT ===================== */}
       <main className="flex-1 p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 max-w-[1680px] w-full mx-auto">
-        {/* ================= LEFT (45%) — SCANNER ================= */}
-        <section className="lg:col-span-5 flex flex-col gap-5">
-          {/* 1. Viewfinder Component */}
-          <div className="bg-white border border-[#E2E8F0] p-4 rounded-[10px]">
-            <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-xs font-semibold text-[#0F172A]">Area Pemindai QR</h2>
-              <span className="text-xs text-[#64748B]">Status: Menunggu Kartu QR</span>
+        {/* ================= LEFT (45%) — SCANNER (KHUSUS GURU, BUKAN ADMIN) ================= */}
+        {!isAdmin && (
+          <section className="lg:col-span-5 flex flex-col gap-5">
+            {/* 1. Viewfinder Component */}
+            <div className="bg-white border border-[#E2E8F0] p-4 rounded-[10px]">
+              <div className="flex items-center justify-between mb-2.5">
+                <h2 className="text-xs font-semibold text-[#0F172A]">Area Pemindai QR</h2>
+                <span className="text-xs text-[#64748B]">Status: Menunggu Kartu QR</span>
+              </div>
+
+              <QRViewfinder
+                onScan={handleScan}
+                isScanning={isSessionOpen}
+                feedbackState={feedbackState}
+                statusMessage={statusMessage}
+              />
             </div>
 
-            <QRViewfinder
-              onScan={handleScan}
-              isScanning={isSessionOpen}
-              feedbackState={feedbackState}
-              statusMessage={statusMessage}
-            />
-          </div>
+            {/* 2. Hasil Scan Terakhir (Jumbo Box - Keterbacaan Jarak 2 Meter) */}
+            <div className="bg-white border border-[#E2E8F0] p-5 rounded-[10px] flex-1 flex flex-col justify-center min-h-[170px]">
+              <p className="text-xs text-[#64748B] mb-2 font-medium">Hasil Scan Terakhir</p>
 
-          {/* 2. Hasil Scan Terakhir (Jumbo Box - Keterbacaan Jarak 2 Meter) */}
-          <div className="bg-white border border-[#E2E8F0] p-5 rounded-[10px] flex-1 flex flex-col justify-center min-h-[170px]">
-            <p className="text-xs text-[#64748B] mb-2 font-medium">Hasil Scan Terakhir</p>
+              {lastScanResult ? (
+                <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
+                  {/* Avatar Siswa Solid */}
+                  <div className="w-16 h-16 rounded-[6px] bg-[#2563EB] text-white font-bold text-xl flex items-center justify-center shrink-0">
+                    {lastScanResult.full_name
+                      ?.split(' ')
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join('') || 'SW'}
+                  </div>
 
-            {lastScanResult ? (
-              <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
-                {/* Avatar Siswa Solid */}
-                <div className="w-16 h-16 rounded-[6px] bg-[#2563EB] text-white font-bold text-xl flex items-center justify-center shrink-0">
-                  {lastScanResult.full_name
-                    ?.split(' ')
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join('') || 'SW'}
-                </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Nama Siswa: Besar untuk keterbacaan 2 meter */}
+                    <h3 className="text-lg sm:text-[24px] font-bold text-[#0F172A] truncate leading-tight tracking-tight">
+                      {lastScanResult.full_name}
+                    </h3>
+                    <p className="text-xs text-[#64748B] mt-1 tabular-nums">
+                      NISN: {lastScanResult.nisn} | Kelas: {lastScanResult.class_name}
+                    </p>
 
-                <div className="flex-1 min-w-0">
-                  {/* Nama Siswa: Besar untuk keterbacaan 2 meter */}
-                  <h3 className="text-lg sm:text-[24px] font-bold text-[#0F172A] truncate leading-tight tracking-tight">
-                    {lastScanResult.full_name}
-                  </h3>
-                  <p className="text-xs text-[#64748B] mt-1 tabular-nums">
-                    NISN: {lastScanResult.nisn} | Kelas: {lastScanResult.class_name}
-                  </p>
-
-                  <div className="mt-2 flex items-center gap-3">
-                    <AttendanceBadge status={lastScanResult.status} size="lg" />
-                    <span className="text-xs text-[#64748B] tabular-nums">
-                      Pukul: {lastScanResult.scan_time} WIB
-                    </span>
+                    <div className="mt-2 flex items-center gap-3">
+                      <AttendanceBadge status={lastScanResult.status} size="lg" />
+                      <span className="text-xs text-[#64748B] tabular-nums">
+                        Pukul: {lastScanResult.scan_time} WIB
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="border border-dashed border-[#CBD5E1] rounded-[6px] p-6 text-center text-[#64748B] text-xs">
-                0 Siswa Hadir. Minta siswa scan kartu.
-              </div>
-            )}
-          </div>
-        </section>
+              ) : (
+                <div className="border border-dashed border-[#CBD5E1] rounded-[6px] p-6 text-center text-[#64748B] text-xs">
+                  0 Siswa Hadir. Minta siswa scan kartu.
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
-        {/* ================= RIGHT (55%) — ROSTER KELAS ================= */}
-        <section className="lg:col-span-7 flex flex-col gap-4">
+        {/* ================= ROSTER KELAS ================= */}
+        <section className={`${isAdmin ? 'lg:col-span-12' : 'lg:col-span-7'} flex flex-col gap-4`}>
           {/* Ringkasan Kehadiran Roster */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
             <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">

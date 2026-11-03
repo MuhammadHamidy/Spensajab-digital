@@ -301,7 +301,7 @@ export default function AttendanceDashboardPage() {
                   className="w-full"
                   onClick={() => router.push(`/attendance/session/${s.id}`)}
                 >
-                  Masuk ke Layar Pemindai QR →
+                  Kelola Roster & Kehadiran Kelas →
                 </Button>
               </div>
             ))}
@@ -457,7 +457,7 @@ export default function AttendanceDashboardPage() {
                       className="w-full"
                       onClick={() => router.push(`/attendance/session/${openSess.id}`)}
                     >
-                      Sesi Aktif — Masuk Pemindai QR →
+                      Sesi Aktif — Kelola Roster Kelas →
                     </Button>
                   ) : (
                     <Button
@@ -466,7 +466,7 @@ export default function AttendanceDashboardPage() {
                       className="w-full"
                       onClick={() => openModalForSchedule(item)}
                     >
-                      Buka Sesi Presensi QR
+                      Buka Sesi Presensi Kelas
                     </Button>
                   )}
                 </div>

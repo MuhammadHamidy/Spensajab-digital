@@ -12,21 +12,46 @@ export default function QRViewfinder({
   const [cameraLoading, setCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState(null);
   const [scannerMode, setScannerMode] = useState('webcam'); // 'webcam' | 'usb'
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' (Belakang) | 'user' (Depan)
   const html5QrCodeRef = useRef(null);
+  const onScanRef = useRef(onScan);
   const scannerContainerId = 'reader-qr-viewfinder';
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  const stopCurrentCamera = async () => {
+    const instance = html5QrCodeRef.current;
+    if (!instance) return;
+    try {
+      if (instance.isScanning) {
+        await instance.stop();
+      }
+      instance.clear();
+    } catch (err) {
+      // Abaikan error saat menghentikan stream lama
+    }
+  };
 
   // Inisialisasi Kamera HTML5-QRCode
   useEffect(() => {
-    if (scannerMode !== 'webcam' || !isScanning) {
-      cleanupCamera();
-      setCameraLoading(false);
-      return;
-    }
-
     let isMounted = true;
-    setCameraLoading(true);
 
-    async function startCamera() {
+    async function manageCamera() {
+      await stopCurrentCamera();
+
+      if (!isMounted) return;
+
+      if (scannerMode !== 'webcam' || !isScanning) {
+        setCameraActive(false);
+        setCameraLoading(false);
+        return;
+      }
+
+      setCameraLoading(true);
+      setCameraError(null);
+
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
         if (!isMounted) return;
@@ -36,8 +61,8 @@ export default function QRViewfinder({
         }
 
         const qrCodeSuccessCallback = (decodedText) => {
-          if (decodedText && isMounted) {
-            onScan(decodedText);
+          if (decodedText && isMounted && onScanRef.current) {
+            onScanRef.current(decodedText);
           }
         };
 
@@ -47,12 +72,23 @@ export default function QRViewfinder({
           aspectRatio: 1.3333,
         };
 
-        await html5QrCodeRef.current.start(
-          { facingMode: 'user' },
-          config,
-          qrCodeSuccessCallback,
-          () => {} // silent scan failure saat scanning per frame
-        );
+        try {
+          await html5QrCodeRef.current.start(
+            { facingMode },
+            config,
+            qrCodeSuccessCallback,
+            () => {}
+          );
+        } catch (primaryErr) {
+          // Fallback otomatis jika perangkat hanya memiliki 1 kamera (mis. laptop)
+          const fallbackMode = facingMode === 'environment' ? 'user' : 'environment';
+          await html5QrCodeRef.current.start(
+            { facingMode: fallbackMode },
+            config,
+            qrCodeSuccessCallback,
+            () => {}
+          );
+        }
 
         if (isMounted) {
           setCameraActive(true);
@@ -65,47 +101,37 @@ export default function QRViewfinder({
           setCameraActive(false);
           setCameraLoading(false);
           setCameraError(
-            'Akses kamera ditolak atau tidak ditemukan. Gunakan Scanner USB atau izinkan browser mengakses webcam.'
+            'Akses kamera ditolak atau tidak ditemukan. Izinkan browser mengakses kamera atau gunakan Scanner USB.'
           );
         }
       }
     }
 
-    startCamera();
+    manageCamera();
 
     return () => {
       isMounted = false;
-      cleanupCamera();
+      stopCurrentCamera();
     };
-  }, [scannerMode, isScanning, onScan]);
+  }, [scannerMode, isScanning, facingMode]);
 
-  const cleanupCamera = () => {
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      html5QrCodeRef.current
-        .stop()
-        .then(() => {
-          try {
-            html5QrCodeRef.current.clear();
-          } catch (e) {}
-          setCameraActive(false);
-        })
-        .catch((err) => console.warn('Error menghentikan kamera:', err));
-    }
+  const toggleFacingMode = () => {
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
   // Border feedback solid sesuai Bagian 5 Design Brief
   let borderColor = 'border-[#CBD5E1]';
   if (feedbackState === 'success') {
-    borderColor = 'border-[#A7F3D0]'; // --status-hadir-border
+    borderColor = 'border-[#A7F3D0]';
   } else if (feedbackState === 'error') {
-    borderColor = 'border-[#FECDD3]'; // --status-alpha-border
+    borderColor = 'border-[#FECDD3]';
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Mode Selector & Status Header */}
-      <div className="flex items-center justify-between bg-[#F8FAFC] p-2 rounded-[6px] border border-[#E2E8F0]">
-        <div className="flex items-center gap-1.5">
+      {/* Mode Selector & Camera Switcher Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#F8FAFC] p-2 rounded-[6px] border border-[#E2E8F0]">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => setScannerMode('webcam')}
@@ -115,7 +141,7 @@ export default function QRViewfinder({
                 : 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
             }`}
           >
-            Webcam
+            Kamera
           </button>
           <button
             type="button"
@@ -130,25 +156,54 @@ export default function QRViewfinder({
           </button>
         </div>
 
-        <span className="text-xs text-[#64748B] flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              cameraActive || scannerMode === 'usb' ? 'bg-[#047857]' : 'bg-[#B45309]'
-            }`}
-          />
-          <span>
-            {scannerMode === 'usb'
-              ? 'Standby Scanner USB'
-              : cameraActive
-              ? 'Kamera Aktif'
-              : cameraLoading
-              ? 'Menghubungkan...'
-              : 'Kamera Nonaktif'}
+        <div className="flex items-center gap-2">
+          {scannerMode === 'webcam' && (
+            <div className="inline-flex items-center rounded-[6px] border border-[#CBD5E1] bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setFacingMode('environment')}
+                className={`px-2.5 py-1 rounded-[4px] text-[11px] font-semibold transition-colors cursor-pointer ${
+                  facingMode === 'environment'
+                    ? 'bg-[#1E4DBD] text-white'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Belakang
+              </button>
+              <button
+                type="button"
+                onClick={() => setFacingMode('user')}
+                className={`px-2.5 py-1 rounded-[4px] text-[11px] font-semibold transition-colors cursor-pointer ${
+                  facingMode === 'user'
+                    ? 'bg-[#1E4DBD] text-white'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Depan
+              </button>
+            </div>
+          )}
+
+          <span className="text-xs text-[#64748B] flex items-center gap-1.5">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                cameraActive || scannerMode === 'usb' ? 'bg-[#047857]' : 'bg-[#B45309]'
+              }`}
+            />
+            <span className="hidden sm:inline">
+              {scannerMode === 'usb'
+                ? 'Standby USB'
+                : cameraActive
+                ? 'Aktif'
+                : cameraLoading
+                ? 'Menghubungkan...'
+                : 'Nonaktif'}
+            </span>
           </span>
-        </span>
+        </div>
       </div>
 
-      {/* Frame Container (Bingkai statis tanpa sudut bersinar, tanpa glow, tanpa laser animation) */}
+      {/* Frame Container */}
       <div
         className={`relative aspect-4/3 w-full bg-white rounded-[10px] overflow-hidden border-2 transition-colors duration-150 flex items-center justify-center ${borderColor}`}
       >
@@ -157,14 +212,31 @@ export default function QRViewfinder({
             {cameraLoading && (
               <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col items-center justify-center gap-2 z-10">
                 <div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-[#64748B]">Menghubungkan kamera...</p>
+                <p className="text-xs text-[#64748B]">
+                  Menghubungkan kamera {facingMode === 'environment' ? 'belakang' : 'depan'}...
+                </p>
               </div>
             )}
 
             {/* Container untuk html5-qrcode */}
             <div id={scannerContainerId} className="w-full h-full object-cover" />
 
-            {/* Bingkai Statis Reticle: Garis tipis statis tanpa animasi */}
+            {/* Tombol Cepat Putar Kamera di Pojok Kanan Atas Kamera */}
+            {!cameraError && cameraActive && (
+              <button
+                type="button"
+                onClick={toggleFacingMode}
+                title="Ganti Kamera Depan / Belakang"
+                className="absolute top-3 right-3 z-20 px-2.5 py-1.5 rounded-lg bg-slate-900/75 hover:bg-slate-900 text-white text-[11px] font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer backdrop-blur-xs"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan'}</span>
+              </button>
+            )}
+
+            {/* Bingkai Statis Reticle */}
             {!cameraError && cameraActive && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                 <div className="w-56 h-56 border border-dashed border-[#CBD5E1] rounded-[6px] flex items-center justify-center">
@@ -182,16 +254,16 @@ export default function QRViewfinder({
                   !
                 </div>
                 <p className="text-xs text-[#64748B] max-w-xs">{cameraError}</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setCameraError(null);
-                      setScannerMode('webcam');
+                      toggleFacingMode();
                     }}
                     className="px-3 py-1.5 rounded-[6px] bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold cursor-pointer"
                   >
-                    Coba Lagi
+                    Coba Kamera {facingMode === 'environment' ? 'Depan' : 'Belakang'}
                   </button>
                   <button
                     type="button"
@@ -205,7 +277,7 @@ export default function QRViewfinder({
             )}
           </>
         ) : (
-          /* Mode USB Standby Screen: Latar terang, datar */
+          /* Mode USB Standby Screen */
           <div className="flex flex-col items-center justify-center p-8 text-center space-y-3 bg-[#F8FAFC] w-full h-full">
             <div className="w-12 h-12 rounded-[6px] bg-white border border-[#CBD5E1] flex items-center justify-center text-sm font-semibold text-[#2563EB]">
               USB
