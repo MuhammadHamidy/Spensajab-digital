@@ -7,6 +7,89 @@ import { accountApiAdapter } from '@/lib/features/auth/infrastructure/accountApi
 import { courseApiAdapter } from '@/lib/features/courses/infrastructure/courseApiAdapter';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
+function makeCourseCode(courseName) {
+  const cleaned = courseName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 20);
+  return cleaned || `MAPEL-${Date.now().toString().slice(-4)}`;
+}
+
+async function resolveCoursesAndClasses(subjectInput, classesInput, teacherId) {
+  const courseNames = String(subjectInput || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const classCodes = String(classesInput || '')
+    .split(',')
+    .map((v) => v.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (courseNames.length === 0) {
+    return { courseIds: [], classIds: [] };
+  }
+
+  const [existingCourses, existingClasses] = await Promise.all([
+    courseApiAdapter.getAll(),
+    classApiAdapter.getAll(),
+  ]);
+
+  const courseIds = [];
+  const classIds = [];
+
+  for (const name of courseNames) {
+    const candidateCode = makeCourseCode(name);
+    let course = existingCourses.find(
+      (c) =>
+        (c.name || '').toLowerCase() === name.toLowerCase() ||
+        (c.code || '').toUpperCase() === name.toUpperCase() ||
+        (c.code || '').toUpperCase() === candidateCode
+    );
+    if (!course) {
+      course = await courseApiAdapter.create({
+        code: candidateCode,
+        name,
+      });
+    }
+    if (course?.id) {
+      courseIds.push(course.id);
+
+      for (const classCode of classCodes) {
+        const existingCls = existingClasses.find(
+          (cl) =>
+            cl.course_id === course.id &&
+            (cl.class_code || '').toUpperCase() === classCode
+        );
+        if (existingCls) {
+          if (teacherId && existingCls.teacher_id !== teacherId && existingCls.dosen_id !== teacherId) {
+            await classApiAdapter.update(existingCls.id, {
+              ...existingCls,
+              course_id: course.id,
+              class_code: classCode,
+              teacher_id: teacherId,
+              academic_year: existingCls.academic_year || '2026/2027',
+            });
+          }
+          classIds.push(existingCls.id);
+        } else if (teacherId) {
+          const createdClass = await classApiAdapter.create({
+            course_id: course.id,
+            class_code: classCode,
+            teacher_id: teacherId,
+            academic_year: '2026/2027',
+          });
+          if (createdClass?.id) {
+            classIds.push(createdClass.id);
+          }
+        }
+      }
+    }
+  }
+
+  return { courseIds, classIds };
+}
+
 export default function MasterTeachersPage() {
   const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState('');
@@ -14,11 +97,14 @@ export default function MasterTeachersPage() {
   const [newNip, setNewNip] = useState('');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [infoBanner, setInfoBanner] = useState('');
   const [newSubject, setNewSubject] = useState('');
   const [newClasses, setNewClasses] = useState('');
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadTeachers = async () => {
     const loadedTeachers = await accountApiAdapter.getTeachers();
@@ -29,10 +115,12 @@ export default function MasterTeachersPage() {
     const name = t.full_name || t.name || '';
     const nip = t.nim_nip || t.nip || '';
     const subject = (t.course_names || []).join(', ') || t.subject || '-';
-    return !search ||
+    return (
+      !search ||
       name.toLowerCase().includes(search.toLowerCase()) ||
       nip.includes(search) ||
-      subject.toLowerCase().includes(search.toLowerCase());
+      subject.toLowerCase().includes(search.toLowerCase())
+    );
   });
 
   React.useEffect(() => {
@@ -40,73 +128,75 @@ export default function MasterTeachersPage() {
   }, []);
 
   const handleAddTeacher = async (e) => {
-    e.preventDefault();
-    if (!newNip || !newName || !newEmail) {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+
+    const cleanNip = newNip.trim();
+    const cleanName = newName.trim();
+    const cleanEmail = newEmail.trim();
+
+    if (!cleanNip || !cleanName || !cleanEmail) {
       setFormError('NIP, nama, dan email wajib diisi.');
       return;
     }
 
+    setIsSubmitting(true);
+    setFormError('');
     try {
       const createdTeacher = await accountApiAdapter.create({
-        username: newNip,
-        email: newEmail,
-        full_name: newName,
-        nim_nip: newNip,
+        username: cleanNip,
+        email: cleanEmail,
+        full_name: cleanName,
+        nim_nip: cleanNip,
+        password: newPassword.trim() || undefined,
         role_id: 'role-guru',
       });
 
-      const courseName = newSubject.trim();
-      const classCodes = newClasses.split(',').map((value) => value.trim()).filter(Boolean);
-      let courseIds = [];
-      let classIds = [];
-
-      if (courseName) {
-        const existingCourses = await courseApiAdapter.getAll();
-        const existingCourse = existingCourses.find(
-          (course) => course.name.toLowerCase() === courseName.toLowerCase()
+      try {
+        const { courseIds, classIds } = await resolveCoursesAndClasses(
+          newSubject,
+          newClasses,
+          createdTeacher.id
         );
-        const course = existingCourse || await courseApiAdapter.create({
-          code: courseName.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30),
-          name: courseName,
-        });
-        courseIds = [course.id];
-
-        for (const classCode of classCodes) {
-          const createdClass = await classApiAdapter.create({
-            course_id: course.id,
-            class_code: classCode,
-            teacher_id: createdTeacher.id,
-            academic_year: '2026/2027',
-          });
-          classIds.push(createdClass.id);
-        }
-      }
-
-      if (courseIds.length || classIds.length) {
-        await accountApiAdapter.update(createdTeacher.id, {
+        if (courseIds.length || classIds.length) {
+          await accountApiAdapter.update(createdTeacher.id, {
             role_id: 'role-guru',
             course_ids: courseIds,
             class_ids: classIds,
           });
+        }
+      } catch (assignErr) {
+        console.warn('Penugasan mapel/kelas guru perlu dilengkapi:', assignErr);
       }
+
       await loadTeachers();
+      const pwdInfo = createdTeacher.generated_password || newPassword.trim();
+      setInfoBanner(
+        pwdInfo
+          ? `Akun guru ${cleanName} berhasil dibuat. NIP/Username: ${cleanNip} | Kata Sandi Awal: ${pwdInfo}`
+          : `Akun guru ${cleanName} berhasil dibuat.`
+      );
       setIsAddModalOpen(false);
       setNewNip('');
       setNewName('');
       setNewEmail('');
+      setNewPassword('');
       setFormError('');
       setNewSubject('');
       setNewClasses('');
     } catch (error) {
       setFormError(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const openEditTeacher = (teacher) => {
     setEditingTeacher(teacher);
-    setNewNip(teacher.nim_nip || teacher.nip || '');
+    setNewNip(teacher.nim_nip || teacher.nip || teacher.username || '');
     setNewName(teacher.full_name || teacher.name || '');
     setNewEmail(teacher.email || '');
+    setNewPassword('');
     setNewSubject((teacher.course_names || []).join(', '));
     setNewClasses((teacher.class_codes || []).join(', '));
     setFormError('');
@@ -114,56 +204,60 @@ export default function MasterTeachersPage() {
   };
 
   const handleEditTeacher = async (e) => {
-    e.preventDefault();
-    if (!editingTeacher || !newNip || !newName || !newEmail) {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+
+    const cleanNip = newNip.trim();
+    const cleanName = newName.trim();
+    const cleanEmail = newEmail.trim();
+
+    if (!editingTeacher || !cleanNip || !cleanName || !cleanEmail) {
       setFormError('NIP, nama, dan email wajib diisi.');
       return;
     }
 
+    setIsSubmitting(true);
+    setFormError('');
     try {
-      const courseName = newSubject.trim();
-      const classCodes = newClasses.split(',').map((value) => value.trim()).filter(Boolean);
-      const existingCourses = await courseApiAdapter.getAll();
-      const existingCourse = existingCourses.find(
-        (course) => course.name.toLowerCase() === courseName.toLowerCase()
+      const { courseIds, classIds } = await resolveCoursesAndClasses(
+        newSubject,
+        newClasses,
+        editingTeacher.id
       );
-      const course = courseName
-        ? existingCourse || await courseApiAdapter.create({
-            code: courseName.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30),
-            name: courseName,
-          })
-        : null;
-
-      for (const classId of editingTeacher.class_ids || []) {
-        await classApiAdapter.delete(classId);
-      }
-
-      const classIds = [];
-      if (course) {
-        for (const classCode of classCodes) {
-          const createdClass = await classApiAdapter.create({
-            course_id: course.id,
-            class_code: classCode,
-            teacher_id: editingTeacher.id,
-            academic_year: '2026/2027',
-          });
-          classIds.push(createdClass.id);
-        }
-      }
 
       await accountApiAdapter.update(editingTeacher.id, {
-        username: newNip,
-        email: newEmail,
-        full_name: newName,
-        nim_nip: newNip,
+        username: cleanNip,
+        email: cleanEmail,
+        full_name: cleanName,
+        nim_nip: cleanNip,
         role_id: 'role-guru',
-        course_ids: course ? [course.id] : [],
+        course_ids: courseIds,
         class_ids: classIds,
       });
       await loadTeachers();
+      setInfoBanner(`Data guru ${cleanName} berhasil diperbarui.`);
       setIsEditModalOpen(false);
       setEditingTeacher(null);
       setFormError('');
+    } catch (error) {
+      setFormError(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (teacher) => {
+    const name = teacher.full_name || teacher.name || teacher.username;
+    if (!window.confirm(`Reset kata sandi untuk guru ${name}?`)) return;
+
+    try {
+      const res = await accountApiAdapter.resetPassword(teacher, { sendEmail: true });
+      const newPwd = res?.new_password || res?.NewPassword || '';
+      setInfoBanner(
+        newPwd
+          ? `Kata sandi guru ${name} (Username: ${teacher.username || teacher.nim_nip}) berhasil direset menjadi: ${newPwd}`
+          : `Kata sandi guru ${name} berhasil direset.`
+      );
     } catch (error) {
       setFormError(error.message);
     }
@@ -176,6 +270,7 @@ export default function MasterTeachersPage() {
     try {
       await accountApiAdapter.delete(teacher.id);
       await loadTeachers();
+      setInfoBanner(`Akun guru ${name} telah dihapus.`);
     } catch (error) {
       setFormError(error.message);
     }
@@ -196,7 +291,16 @@ export default function MasterTeachersPage() {
 
         <button
           type="button"
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setFormError('');
+            setNewNip('');
+            setNewName('');
+            setNewEmail('');
+            setNewPassword('');
+            setNewSubject('');
+            setNewClasses('');
+            setIsAddModalOpen(true);
+          }}
           className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,6 +309,19 @@ export default function MasterTeachersPage() {
           <span>Tambah Guru Baru</span>
         </button>
       </div>
+
+      {infoBanner && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-xs font-medium flex items-center justify-between gap-3">
+          <span>{infoBanner}</span>
+          <button
+            type="button"
+            onClick={() => setInfoBanner('')}
+            className="text-emerald-700 hover:text-emerald-900 font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Search Bar & Counter */}
       <div className="bg-white border border-slate-200/90 p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -251,45 +368,61 @@ export default function MasterTeachersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((teacher) => (
-                <tr key={teacher.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-3 px-4 tabular-nums font-mono text-slate-500">{teacher.nim_nip || teacher.nip}</td>
-                  <td className="py-3 px-4 font-bold text-slate-900">{teacher.full_name || teacher.name}</td>
-                  <td className="py-3 px-4 text-slate-700">{(teacher.course_names || []).join(', ') || teacher.subject || '-'}</td>
-                  <td className="py-3 px-4 tabular-nums text-slate-600 font-medium">{(teacher.class_codes || []).join(', ') || teacher.classes || '-'}</td>
-                  <td className="py-3 px-4">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Aktif
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => openEditTeacher(teacher)}
-                      className="px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold text-xs cursor-pointer transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => alert(`Gunakan menu reset password pada backend untuk akun ${teacher.full_name || teacher.name}.`)}
-                      className="px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold text-xs cursor-pointer transition-colors"
-                    >
-                      Reset Sandi
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTeacher(teacher)}
-                      className="px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold text-xs cursor-pointer transition-colors"
-                    >
-                      Hapus
-                    </button>
-                    </div>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-slate-500">
+                    Belum ada data guru pengajar yang terdaftar.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((teacher) => (
+                  <tr key={teacher.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4 tabular-nums font-mono text-slate-500">
+                      {teacher.nim_nip || teacher.nip || teacher.username}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      {teacher.full_name || teacher.name}
+                    </td>
+                    <td className="py-3 px-4 text-slate-700">
+                      {(teacher.course_names || []).join(', ') || teacher.subject || '-'}
+                    </td>
+                    <td className="py-3 px-4 tabular-nums text-slate-600 font-medium">
+                      {(teacher.class_codes || []).join(', ') || teacher.classes || '-'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Aktif
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditTeacher(teacher)}
+                          className="px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold text-xs cursor-pointer transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResetPassword(teacher)}
+                          className="px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold text-xs cursor-pointer transition-colors"
+                        >
+                          Reset Sandi
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTeacher(teacher)}
+                          className="px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold text-xs cursor-pointer transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -312,6 +445,7 @@ export default function MasterTeachersPage() {
             <Button
               variant="primary"
               size="sm"
+              loading={isSubmitting}
               onClick={handleAddTeacher}
             >
               Simpan Akun Guru
@@ -337,7 +471,7 @@ export default function MasterTeachersPage() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-800 mb-1">
-              Nomor Induk Pegawai (NIP)
+              Nomor Induk Pegawai (NIP) / Username
             </label>
             <input
               type="text"
@@ -359,6 +493,19 @@ export default function MasterTeachersPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Contoh: Siti Rahmawati, S.Pd"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 mb-1">
+              Kata Sandi Awal (Opsional)
+            </label>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Kosongkan untuk buat kata sandi otomatis"
               className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
             />
           </div>
@@ -408,7 +555,12 @@ export default function MasterTeachersPage() {
             >
               Batal
             </Button>
-            <Button variant="primary" size="sm" onClick={handleEditTeacher}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSubmitting}
+              onClick={handleEditTeacher}
+            >
               Simpan Perubahan
             </Button>
           </>

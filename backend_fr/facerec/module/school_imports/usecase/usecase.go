@@ -136,17 +136,9 @@ func (u *useCase) ImportStudentsFromExcel(ctx context.Context, fileReader io.Rea
 			continue
 		}
 
-		classIDs, ok := classMap[normalizeClassCode(className)]
-		if !ok && className != "" {
-			errorList = append(errorList, domain.ImportErrorDetail{
-				Row:    rowNum,
-				Column: "Kode Kelas",
-				Error:  fmt.Sprintf("Kelas '%s' tidak terdaftar di database sekolah", className),
-			})
-			continue
-		}
-		if className == "" {
-			classIDs = nil
+		var classIDs []string
+		if className != "" {
+			classIDs = classMap[normalizeClassCode(className)]
 		}
 
 		validRows = append(validRows, validStudentRow{
@@ -215,7 +207,7 @@ func (u *useCase) ImportStudentsFromExcel(ctx context.Context, fileReader io.Rea
 					"email":         fmt.Sprintf("%s@siswa.sekolah.sch.id", vr.NISN),
 					"full_name":     vr.FullName,
 					"role_id":       "role-siswa",
-					"nim_nip":       "NISN. " + vr.NISN,
+					"nim_nip":       vr.NISN,
 					"nisn":          vr.NISN,
 					"phone":         vr.Phone,
 					"class_name":    vr.ClassName,
@@ -344,11 +336,7 @@ func normalizeGender(value string) (string, string) {
 }
 
 func normalizeClassName(value string) string {
-	normalized := normalizeClassCode(value)
-	if len(normalized) < 2 {
-		return strings.ToUpper(strings.TrimSpace(value))
-	}
-	return normalized[:1] + "-" + normalized[1:]
+	return normalizeClassCode(value)
 }
 
 func (u *useCase) ImportTeachersFromExcel(ctx context.Context, fileReader io.Reader) (*domain.ImportResultResponse, error) {
@@ -484,6 +472,30 @@ func (u *useCase) ImportTeachersFromExcel(ctx context.Context, fileReader io.Rea
 	err = u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, vr := range validRows {
 			hashedPwd, _ := bcrypt.GenerateFromPassword([]byte(vr.Password), bcrypt.DefaultCost)
+			var existing struct {
+				ID string
+			}
+			findErr := tx.Table("accounts").
+				Select("id").
+				Where("username = ? OR email = ? OR nim_nip = ? OR nim_nip = ?", vr.Username, vr.Email, vr.NIP, "NIP. "+vr.NIP).
+				First(&existing).Error
+			if findErr == nil && existing.ID != "" {
+				updates := map[string]interface{}{
+					"username":   vr.Username,
+					"email":      vr.Email,
+					"full_name":  vr.FullName,
+					"role_id":    "role-guru",
+					"nim_nip":    vr.NIP,
+					"phone":      vr.Phone,
+					"is_active":  true,
+					"updated_at": now,
+				}
+				if err := tx.Table("accounts").Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+					return fmt.Errorf("gagal memperbarui guru %s (NIP: %s): %w", vr.FullName, vr.NIP, err)
+				}
+				continue
+			}
+
 			accountData := map[string]interface{}{
 				"id":            vr.ID,
 				"username":      vr.Username,
@@ -491,7 +503,7 @@ func (u *useCase) ImportTeachersFromExcel(ctx context.Context, fileReader io.Rea
 				"email":         vr.Email,
 				"full_name":     vr.FullName,
 				"role_id":       "role-guru",
-				"nim_nip":       "NIP. " + vr.NIP,
+				"nim_nip":       vr.NIP,
 				"phone":         vr.Phone,
 				"is_active":     true,
 				"created_at":    now,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Button from '@/components/Button';
 import Modal from '@/components/Modal';
@@ -9,18 +9,36 @@ import { API_BASE_URL } from '@/lib/common/config';
 
 export default function StudentsQRManagementPage() {
   const [students, setStudents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [search, setSearch] = useState('');
   const [selectedCardForModal, setSelectedCardForModal] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Modal Tambah Siswa
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newNisn, setNewNisn] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newClassName, setNewClassName] = useState('');
+  const [newGender, setNewGender] = useState('L');
+  const [newPhone, setNewPhone] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    accountApiAdapter.getStudents().then((accounts) => {
-      if (cancelled || !Array.isArray(accounts) || accounts.length === 0) return;
-
+  const loadStudents = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const accounts = await accountApiAdapter.getStudents();
+      if (!Array.isArray(accounts)) {
+        setStudents([]);
+        return;
+      }
       const importedStudents = accounts
-        .filter((account) => account.role_name === 'SISWA' || account.roleName === 'SISWA' || account.role_id === 'role-siswa')
+        .filter(
+          (account) =>
+            account.role_name === 'SISWA' ||
+            account.roleName === 'SISWA' ||
+            account.role_id === 'role-siswa'
+        )
         .map((account) => ({
           id: account.id,
           name: account.full_name || account.fullName || account.name || '-',
@@ -29,17 +47,18 @@ export default function StudentsQRManagementPage() {
           gender: account.gender === 'P' ? 'Perempuan' : 'Laki-laki',
           qrToken: account.qr_code_token || account.qrToken || account.id,
         }));
-
-      if (importedStudents.length > 0) setStudents(importedStudents);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+      setStudents(importedStudents);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
+
   const classOptions = useMemo(
-    () => ['ALL', ...new Set(students.map((student) => student.className).filter(Boolean))],
+    () => ['ALL', ...new Set(students.map((student) => student.className).filter((c) => c && c !== '-'))],
     [students]
   );
 
@@ -56,6 +75,58 @@ export default function StudentsQRManagementPage() {
     window.print();
   };
 
+  const handleAddStudent = async (e) => {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+
+    const cleanNisn = newNisn.trim();
+    const cleanName = newName.trim();
+    const cleanClass = newClassName.trim().toUpperCase();
+
+    if (!cleanNisn || !cleanName || !cleanClass) {
+      setFormError('NISN, nama siswa, dan kode rombel wajib diisi.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError('');
+    try {
+      await accountApiAdapter.create({
+        username: `siswa_${cleanNisn}`,
+        email: `${cleanNisn}@siswa.sekolah.sch.id`,
+        full_name: cleanName,
+        nim_nip: cleanNisn,
+        nisn: cleanNisn,
+        class_name: cleanClass,
+        gender: newGender,
+        phone: newPhone.trim(),
+        role_id: 'role-siswa',
+      });
+      await loadStudents();
+      setIsAddModalOpen(false);
+      setNewNisn('');
+      setNewName('');
+      setNewClassName('');
+      setNewGender('L');
+      setNewPhone('');
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStudent = async (student) => {
+    if (!window.confirm(`Hapus data siswa ${student.name} (NISN: ${student.nisn})?`)) return;
+    try {
+      await accountApiAdapter.delete(student.id);
+      setSelectedCardForModal(null);
+      await loadStudents();
+    } catch (err) {
+      alert(err.message || 'Gagal menghapus siswa');
+    }
+  };
+
   return (
     <div className="students-print-page max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -70,6 +141,20 @@ export default function StudentsQRManagementPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              setFormError('');
+              setIsAddModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Tambah Siswa</span>
+          </button>
+
           <button
             type="button"
             onClick={handlePrint}
@@ -125,72 +210,188 @@ export default function StudentsQRManagementPage() {
       </div>
 
       {/* Grid Kartu Siswa (Print Layout Grid A4 / ID Card) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-2 print:gap-4">
-        {filtered.map((student) => (
-          <div
-            key={student.id}
-            className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all print:border-black print:text-black print:rounded-lg print:shadow-none"
-          >
-            {/* Header Kartu dengan Logo Resmi */}
-            <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3 print:border-gray-300">
-              <div className="flex items-center gap-2.5">
-                <div className="student-card-logo w-9 h-9 rounded-lg bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0">
-                  <Image
-                    src="/image/logo-jabon.png"
-                    alt="Logo SMPN 1 Jabon"
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
+      {isLoading ? (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center text-xs text-slate-500">
+          Memuat data siswa...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center text-xs text-slate-500 space-y-1">
+          <p className="font-bold text-slate-800 text-sm">Belum Ada Data Siswa</p>
+          <p>Tambahkan siswa melalui tombol &quot;Tambah Siswa&quot; di atas atau unggah Excel pada menu Import Data.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-2 print:gap-4">
+          {filtered.map((student) => (
+            <div
+              key={student.id}
+              className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all print:border-black print:text-black print:rounded-lg print:shadow-none"
+            >
+              {/* Header Kartu dengan Logo Resmi */}
+              <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3 print:border-gray-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="student-card-logo w-9 h-9 rounded-lg bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0">
+                    <Image
+                      src="/image/logo-jabon.png"
+                      alt="Logo SMPN 1 Jabon"
+                      width={32}
+                      height={32}
+                      className="object-contain"
+                    />
+                  </div>
+                  <div>
+                    <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block print:text-black">
+                      SMP NEGERI 1 JABON
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900 print:text-black leading-tight truncate max-w-[170px]">
+                      {student.name}
+                    </h3>
+                    <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums print:text-gray-700">
+                      NISN: {student.nisn}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block print:text-black">
-                    SMP NEGERI 1 JABON
-                  </span>
-                  <h3 className="text-sm font-bold text-slate-900 print:text-black leading-tight truncate max-w-[170px]">
-                    {student.name}
-                  </h3>
-                  <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums print:text-gray-700">
-                    NISN: {student.nisn}
-                  </p>
-                </div>
+
+                <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold print:border-black print:bg-white print:text-black">
+                  {student.className}
+                </span>
               </div>
 
-              <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold print:border-black print:bg-white print:text-black">
-                {student.className}
-              </span>
-            </div>
+              {/* Area QR Code */}
+              <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
+                  alt={`QR ${student.name}`}
+                  className="w-32 h-32 object-contain rounded-md"
+                  onError={(e) => {
+                    e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
+                  }}
+                />
+                <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums print:text-black">
+                  Token: {student.qrToken.slice(0, 18)}...
+                </span>
+              </div>
 
-            {/* Area QR Code */}
-            <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
-                alt={`QR ${student.name}`}
-                className="w-32 h-32 object-contain rounded-md"
-                onError={(e) => {
-                  e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
-                }}
+              {/* Footer Kartu */}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 print:hidden">
+                <span className="text-slate-500 font-medium">{student.gender}</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteStudent(student)}
+                    className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                  >
+                    Hapus
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCardForModal(student)}
+                    className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                  >
+                    Detail Token →
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal Tambah Siswa */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Tambah Data Siswa Baru"
+        footerActions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsAddModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSubmitting}
+              onClick={handleAddStudent}
+            >
+              Simpan Siswa
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleAddStudent} className="space-y-3.5 text-xs">
+          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-red-700">{formError}</p>}
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 mb-1">
+              NISN Siswa
+            </label>
+            <input
+              type="text"
+              required
+              value={newNisn}
+              onChange={(e) => setNewNisn(e.target.value)}
+              placeholder="Contoh: 0081293820"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 tabular-nums"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 mb-1">
+              Nama Lengkap Siswa
+            </label>
+            <input
+              type="text"
+              required
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Contoh: Muhammad Rizky Pratama"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Rombel / Kelas
+              </label>
+              <input
+                type="text"
+                required
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                placeholder="Contoh: 7A"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900"
               />
-              <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums print:text-black">
-                Token: {student.qrToken.slice(0, 18)}...
-              </span>
             </div>
-
-            {/* Footer Kartu */}
-            <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 print:hidden">
-              <span className="text-slate-500 font-medium">{student.gender}</span>
-              <button
-                type="button"
-                onClick={() => setSelectedCardForModal(student)}
-                className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Jenis Kelamin
+              </label>
+              <select
+                value={newGender}
+                onChange={(e) => setNewGender(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900"
               >
-                Detail Token →
-              </button>
+                <option value="L">Laki-laki (L)</option>
+                <option value="P">Perempuan (P)</option>
+              </select>
             </div>
           </div>
-        ))}
-      </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 mb-1">
+              No. HP Orang Tua (Opsional)
+            </label>
+            <input
+              type="text"
+              value={newPhone}
+              onChange={(e) => setNewPhone(e.target.value)}
+              placeholder="Contoh: 081298765432"
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 tabular-nums"
+            />
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal Detail Token Siswa */}
       <Modal

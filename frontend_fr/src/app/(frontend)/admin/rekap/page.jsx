@@ -33,8 +33,8 @@ export default function AttendanceRekapPage() {
       search,
     }).then((res) => {
       if (!active) return;
-      if (res.success && Array.isArray(res.data)) {
-        setRows(res.data);
+      if (res.success) {
+        setRows(Array.isArray(res.data) ? res.data : []);
       } else {
         setRows([]);
         setError(res.error?.message || 'Rekap presensi gagal dimuat');

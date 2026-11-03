@@ -18,29 +18,32 @@ func (Role) TableName() string {
 }
 
 type Account struct {
-	Id           string    `json:"id" gorm:"primaryKey"`
-	Username     string    `json:"username" gorm:"unique;not null"`
-	PasswordHash string    `json:"-" gorm:"not null"`
-	Password     string    `json:"password,omitempty" gorm:"-"`
-	Email        string    `json:"email" gorm:"unique;not null"`
-	FullName     string    `json:"full_name" gorm:"not null"`
-	RoleId       string    `json:"role_id" gorm:"not null"`
-	RoleName     string    `json:"role_name" gorm:"-"`
-	NimNip       string    `json:"nim_nip"`
-	Phone        string    `json:"phone"`
-	Nisn         string    `json:"nisn"`
-	Gender       string    `json:"gender"`
-	ParentPhone  string    `json:"parent_phone"`
-	Address      string    `json:"address"`
-	PhotoUrl     string    `json:"photo_url"`
-	ClassName    string    `json:"class_name"`
-	CourseIds    []string  `json:"course_ids,omitempty" gorm:"-"`
-	CourseNames  []string  `json:"course_names,omitempty" gorm:"-"`
-	ClassIds     []string  `json:"class_ids,omitempty" gorm:"-"`
-	ClassCodes   []string  `json:"class_codes,omitempty" gorm:"-"`
-	HasFace      bool      `json:"has_face" gorm:"-"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Id                string    `json:"id" gorm:"primaryKey"`
+	Username          string    `json:"username" gorm:"unique;not null"`
+	PasswordHash      string    `json:"-" gorm:"not null"`
+	Password          string    `json:"password,omitempty" gorm:"-"`
+	GeneratedPassword string    `json:"generated_password,omitempty" gorm:"-"`
+	Email             string    `json:"email" gorm:"unique;not null"`
+	FullName          string    `json:"full_name" gorm:"not null"`
+	RoleId            string    `json:"role_id" gorm:"not null"`
+	RoleName          string    `json:"role_name" gorm:"-"`
+	NimNip            string    `json:"nim_nip"`
+	Phone             string    `json:"phone"`
+	Nisn              string    `json:"nisn"`
+	Gender            string    `json:"gender"`
+	ParentPhone       string    `json:"parent_phone"`
+	Address           string    `json:"address"`
+	PhotoUrl          string    `json:"photo_url"`
+	ClassName         string    `json:"class_name"`
+	QrCodeToken       *string   `json:"qr_code_token" gorm:"column:qr_code_token"`
+	IsActive          *bool     `json:"is_active" gorm:"column:is_active;default:true"`
+	CourseIds         []string  `json:"course_ids,omitempty" gorm:"-"`
+	CourseNames       []string  `json:"course_names,omitempty" gorm:"-"`
+	ClassIds          []string  `json:"class_ids,omitempty" gorm:"-"`
+	ClassCodes        []string  `json:"class_codes,omitempty" gorm:"-"`
+	HasFace           bool      `json:"has_face" gorm:"-"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func (Account) TableName() string {

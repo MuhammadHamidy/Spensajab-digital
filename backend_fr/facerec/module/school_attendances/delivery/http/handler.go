@@ -84,7 +84,13 @@ func (h *SchoolAttendanceHandler) GetSessionDetail(c *fiber.Ctx) error {
 }
 
 func (h *SchoolAttendanceHandler) GetSessions(c *fiber.Ctx) error {
-	teacherID := c.Get("X-User-Id", "")
+	teacherID := c.Query("teacher_id", "")
+	if teacherID == "" {
+		headerUser := c.Get("X-User-Id", "")
+		if headerUser != "user-admin-1" {
+			teacherID = headerUser
+		}
+	}
 	classID := c.Query("class_id", "")
 	status := c.Query("status", "")
 

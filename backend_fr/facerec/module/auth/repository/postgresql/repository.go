@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/facerec/facerec-be/facerec/module/auth/domain"
@@ -18,9 +19,41 @@ func NewRepository(db *gorm.DB) domain.AuthRepository {
 	return &Repository{db: db}
 }
 
+func normalizeGenderDB(gender string) string {
+	g := strings.ToUpper(strings.TrimSpace(gender))
+	if strings.HasPrefix(g, "P") || g == "FEMALE" || g == "WANITA" {
+		return "P"
+	}
+	return "L"
+}
+
+func normalizeClassKey(value string) string {
+	s := strings.ToUpper(strings.TrimSpace(value))
+	s = strings.ReplaceAll(s, "KELAS", "")
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, "_", "")
+	return s
+}
+
 func (r *Repository) FindByUsername(ctx context.Context, username string) (*domain.Account, error) {
+	trimmed := strings.TrimSpace(username)
+	if trimmed == "" {
+		return nil, nil
+	}
+
 	var account domain.Account
-	err := r.db.WithContext(ctx).Where("username = ? OR email = ? OR nim_nip = ? OR nisn = ?", username, username, username, username).First(&account).Error
+	err := r.db.WithContext(ctx).
+		Where(
+			"username = ? OR email = ? OR (COALESCE(nim_nip, '') <> '' AND (nim_nip = ? OR nim_nip = ?)) OR (COALESCE(nisn, '') <> '' AND (nisn = ? OR nisn = ?))",
+			trimmed,
+			trimmed,
+			trimmed,
+			"NIP. "+trimmed,
+			trimmed,
+			"NISN. "+trimmed,
+		).
+		First(&account).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -77,14 +110,19 @@ func (r *Repository) FindAccountByID(ctx context.Context, id string) (*domain.Ac
 }
 
 func (r *Repository) FindAllAccounts(ctx context.Context, roleName string) ([]*domain.Account, error) {
-	var accounts []*domain.Account
+	accounts := make([]*domain.Account, 0)
 	query := r.db.WithContext(ctx).Table("accounts")
 
-	if roleName != "" {
+	var matchedRole *domain.Role
+	if strings.TrimSpace(roleName) != "" {
 		var role domain.Role
-		if err := r.db.WithContext(ctx).Where("UPPER(name) = UPPER(?)", roleName).First(&role).Error; err != nil {
+		if err := r.db.WithContext(ctx).Where("UPPER(name) = UPPER(?)", strings.TrimSpace(roleName)).First(&role).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return accounts, nil
+			}
 			return nil, err
 		}
+		matchedRole = &role
 		query = query.Where("accounts.role_id = ?", role.Id)
 	}
 
@@ -93,22 +131,34 @@ func (r *Repository) FindAllAccounts(ctx context.Context, roleName string) ([]*d
 		return nil, err
 	}
 
+	roleCache := make(map[string]string)
+	if matchedRole != nil {
+		roleCache[matchedRole.Id] = matchedRole.Name
+	} else {
+		var allRoles []domain.Role
+		if err := r.db.WithContext(ctx).Find(&allRoles).Error; err == nil {
+			for _, rl := range allRoles {
+				roleCache[rl.Id] = rl.Name
+			}
+		}
+	}
+
 	for _, a := range accounts {
-		var role domain.Role
-		_ = r.db.WithContext(ctx).Where("id = ?", a.RoleId).First(&role).Error
-		a.RoleName = role.Name
+		a.RoleName = roleCache[a.RoleId]
+		if a.RoleId == "role-siswa" && (a.QrCodeToken == nil || *a.QrCodeToken == "") {
+			fallbackToken := a.Id
+			a.QrCodeToken = &fallbackToken
+		}
 
-		var count int64
-		_ = r.db.WithContext(ctx).Table("student_faces").Where("user_id = ?", a.Id).Count(&count).Error
-		a.HasFace = count > 0
+		if a.RoleId == "role-guru" || strings.EqualFold(a.RoleName, "GURU") {
+			courseIDs, courseNames, _ := r.getTeacherCourses(ctx, a.Id)
+			a.CourseIds = courseIDs
+			a.CourseNames = courseNames
 
-		courseIDs, courseNames, _ := r.getTeacherCourses(ctx, a.Id)
-		a.CourseIds = courseIDs
-		a.CourseNames = courseNames
-
-		classIDs, classCodes, _ := r.getTeacherClasses(ctx, a.Id)
-		a.ClassIds = classIDs
-		a.ClassCodes = classCodes
+			classIDs, classCodes, _ := r.getTeacherClasses(ctx, a.Id)
+			a.ClassIds = classIDs
+			a.ClassCodes = classCodes
+		}
 	}
 
 	return accounts, nil
@@ -118,6 +168,12 @@ func (r *Repository) StoreAccount(ctx context.Context, account *domain.Account) 
 	if account.Id == "" {
 		account.Id = uuid.New().String()
 	}
+	account.Gender = normalizeGenderDB(account.Gender)
+	if account.IsActive == nil {
+		active := true
+		account.IsActive = &active
+	}
+
 	err := r.db.WithContext(ctx).Create(account).Error
 	if err != nil {
 		return err
@@ -128,10 +184,16 @@ func (r *Repository) StoreAccount(ctx context.Context, account *domain.Account) 
 	if len(account.ClassIds) > 0 {
 		_ = r.AssignTeacherClasses(ctx, account.Id, account.ClassIds)
 	}
+	if account.RoleId == "role-siswa" && strings.TrimSpace(account.ClassName) != "" {
+		r.syncStudentClassEnrollments(ctx, account.Id, account.ClassName)
+	}
 	return nil
 }
 
 func (r *Repository) UpdateAccount(ctx context.Context, account *domain.Account) error {
+	if account.Gender != "" {
+		account.Gender = normalizeGenderDB(account.Gender)
+	}
 	err := r.db.WithContext(ctx).Model(&domain.Account{}).Where("id = ?", account.Id).Updates(account).Error
 	if err != nil {
 		return err
@@ -142,7 +204,42 @@ func (r *Repository) UpdateAccount(ctx context.Context, account *domain.Account)
 	if account.ClassIds != nil {
 		_ = r.AssignTeacherClasses(ctx, account.Id, account.ClassIds)
 	}
+	if strings.TrimSpace(account.ClassName) != "" {
+		r.syncStudentClassEnrollments(ctx, account.Id, account.ClassName)
+	}
 	return nil
+}
+
+func (r *Repository) syncStudentClassEnrollments(ctx context.Context, studentID string, className string) {
+	targetKey := normalizeClassKey(className)
+	if targetKey == "" {
+		return
+	}
+	var classes []struct {
+		ID        string
+		ClassCode string
+	}
+	if err := r.db.WithContext(ctx).Table("classes").Select("id, class_code").Find(&classes).Error; err != nil {
+		return
+	}
+	now := time.Now()
+	for _, cls := range classes {
+		if normalizeClassKey(cls.ClassCode) != targetKey {
+			continue
+		}
+		var count int64
+		_ = r.db.WithContext(ctx).Table("class_enrollments").
+			Where("class_id = ? AND student_id = ?", cls.ID, studentID).
+			Count(&count).Error
+		if count == 0 {
+			_ = r.db.WithContext(ctx).Table("class_enrollments").Create(map[string]interface{}{
+				"id":          uuid.New().String(),
+				"class_id":    cls.ID,
+				"student_id":  studentID,
+				"enrolled_at": now,
+			}).Error
+		}
+	}
 }
 
 func (r *Repository) DeleteAccount(ctx context.Context, id string) error {
@@ -177,11 +274,16 @@ func (r *Repository) getTeacherCourses(ctx context.Context, teacherId string) ([
 		CourseName string
 	}
 	var results []Result
-	err := r.db.WithContext(ctx).Table("teacher_courses tc").
-		Select("tc.course_id, c.name as course_name").
-		Joins("JOIN courses c ON c.id = tc.course_id").
-		Where("tc.teacher_id = ?", teacherId).
-		Scan(&results).Error
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT DISTINCT c.id AS course_id, c.name AS course_name
+		FROM courses c
+		WHERE c.id IN (
+			SELECT tc.course_id FROM teacher_courses tc WHERE tc.teacher_id = ?
+			UNION
+			SELECT cl.course_id FROM classes cl WHERE cl.dosen_id = ?
+		)
+		ORDER BY c.name ASC
+	`, teacherId, teacherId).Scan(&results).Error
 
 	if err != nil {
 		return nil, nil, err
@@ -224,11 +326,13 @@ func (r *Repository) getTeacherClasses(ctx context.Context, teacherId string) ([
 		ClassCode string
 	}
 	var results []Result
-	err := r.db.WithContext(ctx).Table("teacher_classes tc").
-		Select("tc.class_id, c.class_code").
-		Joins("JOIN classes c ON c.id = tc.class_id").
-		Where("tc.teacher_id = ?", teacherId).
-		Scan(&results).Error
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT DISTINCT c.id AS class_id, c.class_code
+		FROM classes c
+		WHERE c.dosen_id = ?
+		   OR c.id IN (SELECT tc.class_id FROM teacher_classes tc WHERE tc.teacher_id = ?)
+		ORDER BY c.class_code ASC
+	`, teacherId, teacherId).Scan(&results).Error
 
 	if err != nil {
 		return nil, nil, err
@@ -236,9 +340,13 @@ func (r *Repository) getTeacherClasses(ctx context.Context, teacherId string) ([
 
 	var ids []string
 	var codes []string
+	seenCode := make(map[string]bool)
 	for _, res := range results {
 		ids = append(ids, res.ClassId)
-		codes = append(codes, res.ClassCode)
+		if !seenCode[res.ClassCode] {
+			seenCode[res.ClassCode] = true
+			codes = append(codes, res.ClassCode)
+		}
 	}
 	return ids, codes, nil
 }

@@ -159,7 +159,7 @@ type ScanResultResponse struct {
 // Course merepresentasikan data master mata pelajaran (Mapel)
 type Course struct {
 	ID          string `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	Code        string `json:"code" gorm:"type:varchar(30);not null;unique"`
+	Code        string `json:"code" gorm:"type:varchar(50);not null;unique"`
 	Name        string `json:"name" gorm:"type:varchar(150);not null"`
 	SKS         int    `json:"sks" gorm:"default:3"`
 	Description string `json:"description" gorm:"type:text"`
@@ -176,6 +176,7 @@ type Class struct {
 	CourseName        string `json:"course_name"`
 	ClassCode         string `json:"class_code"`
 	TeacherID         string `json:"teacher_id"`
+	DosenID           string `json:"dosen_id"`
 	TeacherName       string `json:"teacher_name"`
 	AcademicYear      string `json:"academic_year"`
 	Room              string `json:"room"`

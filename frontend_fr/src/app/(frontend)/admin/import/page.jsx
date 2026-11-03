@@ -245,7 +245,7 @@ export default function BulkImportExcelPage() {
             </h4>
           </div>
           <p className="text-xs text-emerald-800">
-            Sebanyak <strong className="tabular-nums">{result.inserted ?? 0} data siswa</strong> berhasil diproses dan disimpan ke sistem presensi
+            Sebanyak <strong className="tabular-nums">{result.inserted ?? 0} {activeTab === 'students' ? 'data siswa' : 'data guru'}</strong> berhasil diproses dan disimpan ke sistem presensi
             {result.total_rows != null && ` dari ${result.total_rows} baris data`}.
           </p>
         </div>

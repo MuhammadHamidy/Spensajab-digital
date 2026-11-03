@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/facerec/facerec-be/facerec/module/auth/domain"
 	"github.com/facerec/facerec-be/facerec/module/auth/mailer"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,6 +43,7 @@ func generateRandomPassword() string {
 }
 
 func (u *useCase) Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResponse, error) {
+	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
 		return nil, errors.New("username dan password wajib diisi")
 	}
@@ -90,12 +94,62 @@ func (u *useCase) GetAccountList(ctx context.Context, roleName string) ([]*domai
 }
 
 func (u *useCase) CreateAccount(ctx context.Context, account *domain.Account) error {
-	if account.Username == "" {
-		return errors.New("username wajib diisi")
+	account.Username = strings.TrimSpace(account.Username)
+	account.Email = strings.TrimSpace(account.Email)
+	account.FullName = strings.TrimSpace(account.FullName)
+	account.NimNip = strings.TrimSpace(account.NimNip)
+	account.Nisn = strings.TrimSpace(account.Nisn)
+
+	if account.RoleId == "" {
+		switch strings.ToUpper(strings.TrimSpace(account.RoleName)) {
+		case "ADMIN":
+			account.RoleId = "role-admin"
+		case "GURU", "DOSEN":
+			account.RoleId = "role-guru"
+		case "SISWA", "MAHASISWA":
+			account.RoleId = "role-siswa"
+		default:
+			account.RoleId = "role-guru"
+		}
 	}
-	if account.RoleId == "role-guru" || account.RoleName == "GURU" {
+
+	if account.Username == "" {
+		if account.NimNip != "" {
+			account.Username = account.NimNip
+		} else if account.Nisn != "" {
+			account.Username = "siswa_" + account.Nisn
+		}
+	}
+
+	if account.Username == "" {
+		return errors.New("username atau NIP/NISN wajib diisi")
+	}
+
+	if account.FullName == "" {
+		account.FullName = account.Username
+	}
+
+	if account.Email == "" {
+		domainSuffix := "sekolah.sch.id"
+		if account.RoleId == "role-siswa" {
+			domainSuffix = "siswa.sekolah.sch.id"
+		} else if account.RoleId == "role-guru" {
+			domainSuffix = "guru.sekolah.sch.id"
+		}
+		account.Email = fmt.Sprintf("%s@%s", strings.ToLower(strings.ReplaceAll(account.Username, " ", "_")), domainSuffix)
+	}
+
+	if account.RoleId == "role-guru" || strings.EqualFold(account.RoleName, "GURU") {
 		if account.Password == "" {
 			account.Password = generateRandomPassword()
+		}
+	} else if account.RoleId == "role-siswa" || strings.EqualFold(account.RoleName, "SISWA") {
+		if account.Password == "" {
+			account.Password = "password123"
+		}
+		if account.QrCodeToken == nil || strings.TrimSpace(*account.QrCodeToken) == "" {
+			token := uuid.New().String()
+			account.QrCodeToken = &token
 		}
 	} else if account.Password == "" {
 		return errors.New("password wajib diisi")
@@ -105,6 +159,12 @@ func (u *useCase) CreateAccount(ctx context.Context, account *domain.Account) er
 	if existing != nil {
 		return errors.New("username atau NIP/NISN sudah terdaftar")
 	}
+	if account.Email != "" && !strings.EqualFold(account.Email, account.Username) {
+		existingByEmail, _ := u.repo.FindByUsername(ctx, account.Email)
+		if existingByEmail != nil {
+			return errors.New("alamat email sudah digunakan oleh akun lain")
+		}
+	}
 
 	rawPassword := account.Password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(account.Password), bcrypt.DefaultCost)
@@ -112,6 +172,7 @@ func (u *useCase) CreateAccount(ctx context.Context, account *domain.Account) er
 		return err
 	}
 	account.PasswordHash = string(hashedPassword)
+	account.GeneratedPassword = rawPassword
 	account.Password = ""
 
 	err = u.repo.StoreAccount(ctx, account)
@@ -120,7 +181,7 @@ func (u *useCase) CreateAccount(ctx context.Context, account *domain.Account) er
 	}
 
 	// Send access email to teacher if role is GURU and email is present
-	if (account.RoleId == "role-guru" || account.RoleName == "GURU") && account.Email != "" && rawPassword != "" {
+	if (account.RoleId == "role-guru" || strings.EqualFold(account.RoleName, "GURU")) && account.Email != "" && rawPassword != "" {
 		createdAccount, errFind := u.repo.FindAccountByID(ctx, account.Id)
 		if errFind == nil && createdAccount != nil {
 			go func() {
@@ -209,7 +270,6 @@ func (u *useCase) SendAccessEmail(ctx context.Context, id string, customPassword
 
 	password := customPassword
 	if password == "" {
-		// If password is not provided, generate a new temporary password and update it
 		password = generateRandomPassword()
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
@@ -235,7 +295,6 @@ func (u *useCase) UpdateProfile(ctx context.Context, id string, req domain.Updat
 		return nil, errors.New("akun tidak ditemukan")
 	}
 
-	// Check if username changed and verify uniqueness
 	if req.Username != "" && req.Username != current.Username {
 		existing, _ := u.repo.FindByUsername(ctx, req.Username)
 		if existing != nil && existing.Id != id {
@@ -245,7 +304,6 @@ func (u *useCase) UpdateProfile(ctx context.Context, id string, req domain.Updat
 
 	var newPasswordHash string
 	if req.NewPassword != "" {
-		// If old password provided, verify it
 		if req.OldPassword != "" {
 			err = bcrypt.CompareHashAndPassword([]byte(current.PasswordHash), []byte(req.OldPassword))
 			if err != nil {

@@ -27,18 +27,11 @@ export const accountApiAdapter = {
   getStudents: async () => {
     try {
       const res = await httpClient.get('/accounts?role=SISWA', { cache: 'no-store' });
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data;
-      }
-      const resMhs = await httpClient.get('/accounts?role=MAHASISWA', { cache: 'no-store' });
-      if (Array.isArray(resMhs.data) && resMhs.data.length > 0) {
-        return resMhs.data;
-      }
+      return Array.isArray(res.data) ? res.data : [];
     } catch (err) {
       console.warn('Backend akun siswa tidak dapat diakses:', err.message);
       return [];
     }
-    return [];
   },
 
   create: async (accountData) => {
@@ -59,7 +52,7 @@ export const accountApiAdapter = {
       const res = await httpClient.post('/accounts', payload);
       return res.data || payload;
     } catch (error) {
-      throw new Error(error?.response?.data?.message || 'Akun tidak dapat dibuat di backend');
+      throw new Error(error?.message || error?.response?.data?.message || 'Akun tidak dapat dibuat di backend');
     }
   },
 
