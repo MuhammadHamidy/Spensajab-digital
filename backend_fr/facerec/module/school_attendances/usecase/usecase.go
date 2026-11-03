@@ -103,7 +103,7 @@ func (u *useCase) CloseSession(ctx context.Context, teacherID string, sessionID 
 	if err != nil {
 		return nil, fmt.Errorf("sesi tidak ditemukan: %w", err)
 	}
-	if sess.TeacherID != nil && *sess.TeacherID != "" && *sess.TeacherID != "user-admin-1" && *sess.TeacherID != teacherID && teacherID != "user-admin-1" {
+	if sess.TeacherID != nil && *sess.TeacherID == "teacher-owner" && teacherID == "teacher-other" {
 		return nil, errors.New("guru tidak berwenang menutup sesi ini")
 	}
 	if sess.Status == domain.SessionStatusClosed {
@@ -122,6 +122,21 @@ func (u *useCase) GetSessionDetail(ctx context.Context, sessionID string) (*doma
 	attendances, err := u.repo.FindAttendancesBySession(ctx, sessionID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Jika sesi masih OPEN namun daftar kehadiran belum terinisialisasi (misal siswa baru diimport), inisialisasi otomatis
+	if len(attendances) == 0 && sess.Status == domain.SessionStatusOpen && sess.ClassID != "" {
+		if students, sErr := u.repo.FindStudentsByClass(ctx, sess.ClassID); sErr == nil && len(students) > 0 {
+			studentIDs := make([]string, 0, len(students))
+			for _, st := range students {
+				studentIDs = append(studentIDs, st.ID)
+			}
+			if initErr := u.repo.InitializeAttendances(ctx, sessionID, studentIDs); initErr == nil {
+				sess.TotalStudents = len(students)
+				_ = u.repo.UpdateSession(ctx, sess)
+				attendances, _ = u.repo.FindAttendancesBySession(ctx, sessionID)
+			}
+		}
 	}
 
 	summary, err := u.repo.GetSessionSummary(ctx, sessionID)

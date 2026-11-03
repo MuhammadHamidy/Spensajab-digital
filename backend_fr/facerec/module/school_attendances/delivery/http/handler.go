@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/facerec/facerec-be/facerec/module/school_attendances/domain"
 	"github.com/facerec/facerec-be/libraries/responses"
@@ -202,14 +203,31 @@ func (h *SchoolAttendanceHandler) GetClasses(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(responses.Fail("INTERNAL_ERROR", err.Error()))
 	}
-	teacherFilter := c.Query("dosen_id")
-	if teacherFilter == "" {
-		teacherFilter = c.Query("teacher_id")
+	if c.Query("include_all") == "true" {
+		return c.Status(http.StatusOK).JSON(responses.Success(list, "Daftar kelas berhasil dimuat"))
 	}
-	if teacherFilter != "" && teacherFilter != "user-admin-1" {
+	teacherFilter := strings.TrimSpace(c.Query("dosen_id"))
+	if teacherFilter == "" {
+		teacherFilter = strings.TrimSpace(c.Query("teacher_id"))
+	}
+	teacherNameFilter := strings.TrimSpace(c.Query("teacher_name"))
+
+	if (teacherFilter != "" && teacherFilter != "user-admin-1") || teacherNameFilter != "" {
+		// Jika teacherNameFilter kosong, cari nama guru dari salah satu kelas yang cocok dengan teacherFilter
+		if teacherNameFilter == "" && teacherFilter != "" {
+			for _, item := range list {
+				if (item.TeacherID == teacherFilter || item.DosenID == teacherFilter) && strings.TrimSpace(item.TeacherName) != "" {
+					teacherNameFilter = strings.TrimSpace(item.TeacherName)
+					break
+				}
+			}
+		}
+
 		filtered := make([]*domain.Class, 0)
 		for _, item := range list {
-			if item.TeacherID == teacherFilter || item.DosenID == teacherFilter {
+			matchID := teacherFilter != "" && (item.TeacherID == teacherFilter || item.DosenID == teacherFilter)
+			matchName := teacherNameFilter != "" && strings.EqualFold(strings.TrimSpace(item.TeacherName), teacherNameFilter)
+			if matchID || matchName {
 				filtered = append(filtered, item)
 			}
 		}

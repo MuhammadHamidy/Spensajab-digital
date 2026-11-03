@@ -10,6 +10,8 @@ import { attendanceApi } from '@/lib/attendanceApi';
 import { attendanceAudio } from '@/lib/attendanceAudio';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
+const DAYS_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
 function classScheduleTime(item) {
   if (item.schedule_start_time || item.schedule_end_time) {
     return [item.schedule_start_time, item.schedule_end_time].filter(Boolean).join(' - ');
@@ -63,84 +65,80 @@ export default function GuruMobilePortal({ user, onLogout }) {
 
   // Form Buka Kelas
   const [assignedClasses, setAssignedClasses] = useState([]);
+  const [allSchoolClasses, setAllSchoolClasses] = useState([]);
   const [newClassId, setNewClassId] = useState('');
   const [newSessionNumber, setNewSessionNumber] = useState(1);
   const [newTopic, setNewTopic] = useState('');
+  const [openClassError, setOpenClassError] = useState('');
 
   // Filter & Search Absensi
   const [searchRoster, setSearchRoster] = useState('');
   const [filterRosterStatus, setFilterRosterStatus] = useState('ALL');
 
   const fetchAssignedClasses = useCallback(async () => {
-    let rawList = [];
-    if (user?.id) {
-      rawList = await classApiAdapter.getAll({ dosenId: user.id });
-    }
-    if (!Array.isArray(rawList) || rawList.length === 0) {
-      rawList = await classApiAdapter.getAll();
-    }
-    const list = Array.isArray(rawList) ? rawList : [];
-    const hasScheduledSibling = new Set(
-      list
-        .filter((c) => c.schedule_day || c.schedule_time || c.schedule_start_time)
-        .map((c) => `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`)
-    );
-    const cleanedList = list.filter((c) => {
-      const isScheduled = Boolean(c.schedule_day || c.schedule_time || c.schedule_start_time);
-      if (isScheduled) return true;
-      const key = `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`;
-      return !hasScheduledSibling.has(key);
+    const teacherName = user?.fullName || user?.full_name || user?.name || '';
+    const [teacherRaw, allRaw] = await Promise.all([
+      user?.id
+        ? classApiAdapter.getAll({ dosenId: user.id, teacherName })
+        : Promise.resolve([]),
+      classApiAdapter.getAll({ includeAll: true }),
+    ]);
+
+    const cleanScheduleDuplicates = (arr) => {
+      const list = Array.isArray(arr) ? arr : [];
+      const hasScheduledSibling = new Set(
+        list
+          .filter((c) => c.schedule_day || c.schedule_time || c.schedule_start_time)
+          .map((c) => `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`)
+      );
+      return list.filter((c) => {
+        const isScheduled = Boolean(c.schedule_day || c.schedule_time || c.schedule_start_time);
+        if (isScheduled) return true;
+        const key = `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`;
+        return !hasScheduledSibling.has(key);
+      });
+    };
+
+    const cleanedAll = cleanScheduleDuplicates(allRaw);
+    setAllSchoolClasses(cleanedAll);
+
+    const normTeacherName = String(teacherName).trim().toLowerCase();
+    const matchedFromAll = cleanedAll.filter((c) => {
+      if (user?.id && (c.dosen_id === user.id || c.teacher_id === user.id)) return true;
+      if (normTeacherName && String(c.teacher_name || '').trim().toLowerCase() === normTeacherName) return true;
+      return false;
     });
-    setAssignedClasses(cleanedList);
-    setNewClassId((current) => current || cleanedList[0]?.id || '');
-  }, [user?.id]);
+
+    let finalAssigned = matchedFromAll.length > 0
+      ? matchedFromAll
+      : cleanScheduleDuplicates(teacherRaw);
+
+    if (finalAssigned.length === 0) {
+      finalAssigned = cleanedAll;
+    }
+
+    const todayName = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
+    finalAssigned.sort((a, b) => {
+      const aToday = a.schedule_day === todayName ? 0 : 1;
+      const bToday = b.schedule_day === todayName ? 0 : 1;
+      if (aToday !== bToday) return aToday - bToday;
+      const dayA = DAYS_ORDER.indexOf(a.schedule_day);
+      const dayB = DAYS_ORDER.indexOf(b.schedule_day);
+      const normDayA = dayA === -1 ? 99 : dayA;
+      const normDayB = dayB === -1 ? 99 : dayB;
+      if (normDayA !== normDayB) return normDayA - normDayB;
+      return String(a.class_code || '').localeCompare(String(b.class_code || ''));
+    });
+
+    setAssignedClasses(finalAssigned);
+    setNewClassId((current) => current || finalAssigned[0]?.id || cleanedAll[0]?.id || '');
+  }, [user?.id, user?.fullName, user?.full_name, user?.name]);
 
   useEffect(() => {
     fetchAssignedClasses().catch(() => setAssignedClasses([]));
   }, [fetchAssignedClasses]);
 
-  // 1. Fetch Daftar Sesi
-  const fetchSessionsList = useCallback(async () => {
-    const res = await attendanceApi.getSessions({ teacher_id: user?.id || '' });
-    const sessionList = res.success && Array.isArray(res.data) ? res.data : [];
-
-    setSessions(sessionList);
-
-    const openSess = sessionList.find((s) => s.status === 'OPEN');
-    if (openSess) {
-      setActiveSession(openSess);
-      if (!selectedSessionId) {
-        setSelectedSessionId(openSess.id);
-      }
-    } else if (sessionList.length > 0) {
-      setActiveSession(null);
-      setSelectedSessionId((current) => (
-        current && sessionList.some((session) => session.id === current)
-          ? current
-          : sessionList[0].id
-      ));
-    } else {
-      setActiveSession(null);
-      setSelectedSessionId(null);
-      setSessionDetail(null);
-      setAttendances([]);
-      setSummary({
-        total_students: 0,
-        total_hadir: 0,
-        total_late: 0,
-        total_sakit: 0,
-        total_izin: 0,
-        total_alpha: 0,
-        total_pending: 0,
-      });
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchSessionsList();
-  }, [fetchSessionsList]);
-
-  // 2. Fetch Detail Sesi Terpilih (Roster & Summary)
+  // 1. Fetch Detail Sesi Terpilih (Roster & Summary)
   const fetchSelectedSessionDetail = useCallback(async (sessId) => {
     if (!sessId) {
       setSessionDetail(null);
@@ -167,11 +165,118 @@ export default function GuruMobilePortal({ user, onLogout }) {
     }
   }, []);
 
+  // 2. Fetch Daftar Sesi (Menggabungkan Live Monitoring + Sesi Guru agar sesi OPEN selalu terdeteksi)
+  const fetchSessionsList = useCallback(async () => {
+    const [liveRes, teacherSessionsRes] = await Promise.all([
+      attendanceApi.getLiveMonitoring(),
+      attendanceApi.getSessions({ teacher_id: user?.id || '' }),
+    ]);
+
+    const liveList = liveRes?.success && Array.isArray(liveRes.data) ? liveRes.data : [];
+    const teacherList =
+      teacherSessionsRes?.success && Array.isArray(teacherSessionsRes.data)
+        ? teacherSessionsRes.data
+        : [];
+
+    const mergedMap = new Map();
+    for (const s of liveList) {
+      if (s?.id) mergedMap.set(s.id, s);
+    }
+    for (const s of teacherList) {
+      if (s?.id && !mergedMap.has(s.id)) {
+        mergedMap.set(s.id, s);
+      }
+    }
+
+    const sessionList = Array.from(mergedMap.values());
+    const normTeacherName = String(user?.fullName || user?.full_name || user?.name || '')
+      .trim()
+      .toLowerCase();
+
+    const isTeacherMatch = (s) => {
+      if (!s) return false;
+      if (user?.id && s.teacher_id === user.id) return true;
+      if (
+        normTeacherName &&
+        String(s.teacher_name || '')
+          .trim()
+          .toLowerCase() === normTeacherName
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    sessionList.sort((a, b) => {
+      const aOpen = a.status === 'OPEN' ? 0 : 1;
+      const bOpen = b.status === 'OPEN' ? 0 : 1;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+      const aMine = isTeacherMatch(a) ? 0 : 1;
+      const bMine = isTeacherMatch(b) ? 0 : 1;
+      if (aMine !== bMine) return aMine - bMine;
+      return new Date(b.created_at || b.opened_at || 0) - new Date(a.created_at || a.opened_at || 0);
+    });
+
+    setSessions(sessionList);
+
+    const openSessions = sessionList.filter((s) => s.status === 'OPEN');
+    const preferredOpen =
+      openSessions.find((s) => isTeacherMatch(s)) || openSessions[0] || null;
+
+    if (preferredOpen) {
+      setActiveSession((prev) => {
+        if (prev && openSessions.some((s) => s.id === prev.id)) {
+          return openSessions.find((s) => s.id === prev.id) || preferredOpen;
+        }
+        return preferredOpen;
+      });
+      setSelectedSessionId((current) => {
+        if (current && openSessions.some((s) => s.id === current)) {
+          return current;
+        }
+        return preferredOpen.id;
+      });
+    } else if (sessionList.length > 0) {
+      setActiveSession(null);
+      setSelectedSessionId((current) =>
+        current && sessionList.some((session) => session.id === current)
+          ? current
+          : sessionList[0].id
+      );
+    } else {
+      setActiveSession(null);
+      setSelectedSessionId(null);
+      setSessionDetail(null);
+      setAttendances([]);
+      setSummary({
+        total_students: 0,
+        total_hadir: 0,
+        total_late: 0,
+        total_sakit: 0,
+        total_izin: 0,
+        total_alpha: 0,
+        total_pending: 0,
+      });
+    }
+  }, [user?.id, user?.fullName, user?.full_name, user?.name]);
+
+  useEffect(() => {
+    fetchSessionsList();
+    const interval = setInterval(() => {
+      fetchSessionsList();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [fetchSessionsList]);
+
   useEffect(() => {
     if (selectedSessionId) {
       fetchSelectedSessionDetail(selectedSessionId);
+      const selectedObj = sessions.find((s) => s.id === selectedSessionId);
+      if (selectedObj && selectedObj.status === 'OPEN') {
+        setActiveSession(selectedObj);
+      }
     }
-  }, [selectedSessionId, fetchSelectedSessionDetail]);
+  }, [selectedSessionId, fetchSelectedSessionDetail, sessions]);
 
   // 3. Countdown Timer 15 Menit Sesi Aktif
   useEffect(() => {
@@ -282,12 +387,16 @@ export default function GuruMobilePortal({ user, onLogout }) {
 
   // 6. Buka Kelas Baru
   const handleOpenClassSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    setOpenClassError('');
     setIsSubmitting(true);
 
-    const cls = assignedClasses.find((c) => c.id === newClassId);
+    const cls =
+      assignedClasses.find((c) => c.id === newClassId) ||
+      allSchoolClasses.find((c) => c.id === newClassId);
     if (!cls) {
       setIsSubmitting(false);
+      setOpenClassError('Pilih kelas terlebih dahulu.');
       return;
     }
     const res = await attendanceApi.openSession(
@@ -299,12 +408,21 @@ export default function GuruMobilePortal({ user, onLogout }) {
     setIsSubmitting(false);
 
     if (res.success && res.data) {
+      const openedSess = res.data;
+      const openedId = openedSess.id || openedSess.session_id;
       setIsOpenClassModalOpen(false);
-      setSelectedSessionId(res.data.id || res.data.session_id);
+      setActiveSession(openedSess);
+      setSelectedSessionId(openedId);
       await fetchSessionsList();
+      if (openedId) {
+        await fetchSelectedSessionDetail(openedId);
+      }
       setActiveTab('scan');
     } else {
-      setStatusMessage(res.error?.message || res.message || 'Kelas belum dapat dibuka. Silakan coba lagi.');
+      const errMsg =
+        res.error?.message || res.message || 'Kelas belum dapat dibuka. Silakan coba lagi.';
+      setOpenClassError(errMsg);
+      setStatusMessage(errMsg);
     }
   };
 
@@ -398,10 +516,10 @@ export default function GuruMobilePortal({ user, onLogout }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {activeSession ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#ECFDF5] border border-[#A7F3D0] text-[11px] font-semibold text-[#047857]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#047857]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#047857] animate-ping" />
               Kelas {activeSession.class_name} Buka
             </span>
           ) : (
@@ -409,6 +527,19 @@ export default function GuruMobilePortal({ user, onLogout }) {
               Belum Ada Kelas
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              fetchSessionsList();
+              fetchAssignedClasses();
+              if (selectedSessionId) fetchSelectedSessionDetail(selectedSessionId);
+            }}
+            title="Segarkan Data Sesi"
+            className="w-7 h-7 rounded-[6px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] flex items-center justify-center text-xs text-[#2563EB] font-bold cursor-pointer"
+          >
+            ↻
+          </button>
 
           <button
             type="button"
@@ -503,13 +634,13 @@ export default function GuruMobilePortal({ user, onLogout }) {
                 <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">
                   <span className="text-[11px] text-[#64748B] block">Hadir</span>
                   <span className="text-base font-bold text-[#047857] tabular-nums">
-                    {activeSession ? (summary.total_hadir ?? 0) : 0}
+                    {activeSession ? (summary.total_hadir ?? activeSession.total_present ?? 0) : 0}
                   </span>
                 </div>
                 <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">
                   <span className="text-[11px] text-[#64748B] block">Terlambat</span>
                   <span className="text-base font-bold text-[#B45309] tabular-nums">
-                    {activeSession ? (summary.total_late ?? 0) : 0}
+                    {activeSession ? (summary.total_late ?? activeSession.total_late ?? 0) : 0}
                   </span>
                 </div>
                 <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">
@@ -523,7 +654,7 @@ export default function GuruMobilePortal({ user, onLogout }) {
                 <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">
                   <span className="text-[11px] text-[#64748B] block">Alpha</span>
                   <span className="text-base font-bold text-[#BE123C] tabular-nums">
-                    {activeSession ? (summary.total_alpha ?? 0) : 0}
+                    {activeSession ? (summary.total_alpha ?? activeSession.total_alpha ?? 0) : 0}
                   </span>
                 </div>
               </div>
@@ -541,55 +672,112 @@ export default function GuruMobilePortal({ user, onLogout }) {
               </div>
 
               <div className="space-y-2 text-xs">
-                {assignedClasses.map((c) => {
-                  const isCurrentActive =
-                    activeSession?.class_id === c.id || activeSession?.class_name === c.class_code;
+                {(() => {
+                  const openSessionsList = sessions.filter((s) => s.status === 'OPEN');
+                  const combinedMap = new Map();
+                  for (const c of assignedClasses) {
+                    if (c?.id) combinedMap.set(c.id, c);
+                  }
+                  for (const os of openSessionsList) {
+                    if (os?.class_id && !combinedMap.has(os.class_id)) {
+                      const foundFromAll = allSchoolClasses.find((c) => c.id === os.class_id);
+                      if (foundFromAll) {
+                        combinedMap.set(foundFromAll.id, foundFromAll);
+                      } else {
+                        combinedMap.set(os.class_id, {
+                          id: os.class_id,
+                          class_code: os.class_name,
+                          course_name: os.course_name || os.topic,
+                          schedule_day: os.schedule_day,
+                          schedule_time: os.schedule_time,
+                          room: os.room,
+                        });
+                      }
+                    }
+                  }
                   const todayName = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
-                  const isToday = Boolean(c.schedule_day && c.schedule_day === todayName);
+                  const displayClasses = Array.from(combinedMap.values()).sort((a, b) => {
+                    const aOpen = openSessionsList.some(
+                      (s) => s.class_id === a.id || s.class_name === a.class_code
+                    )
+                      ? 0
+                      : 1;
+                    const bOpen = openSessionsList.some(
+                      (s) => s.class_id === b.id || s.class_name === b.class_code
+                    )
+                      ? 0
+                      : 1;
+                    if (aOpen !== bOpen) return aOpen - bOpen;
+                    const aToday = a.schedule_day === todayName ? 0 : 1;
+                    const bToday = b.schedule_day === todayName ? 0 : 1;
+                    if (aToday !== bToday) return aToday - bToday;
+                    return 0;
+                  });
 
-                  return (
-                    <div
-                      key={c.id}
-                      className={`p-2.5 rounded-[6px] border flex items-center justify-between gap-2 ${
-                        isToday ? 'bg-blue-50/50 border-blue-200' : 'bg-[#F8FAFC] border-[#E2E8F0]'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-[#0F172A]">
-                            Kelas {c.class_code} ({c.course_name || c.course_code || 'Mata Pelajaran'})
-                          </span>
-                          {isToday && (
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                              Hari Ini
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-[#64748B] tabular-nums mt-0.5">
-                          {c.schedule_day ? `${c.schedule_day}, ` : ''}{classScheduleTime(c)}{c.room ? ` · Ruang ${c.room}` : ''}
-                        </p>
-                      </div>
+                  return displayClasses.map((c) => {
+                    const openForClass = openSessionsList.find(
+                      (s) => s.class_id === c.id || s.class_name === c.class_code
+                    );
+                    const isCurrentActive = Boolean(openForClass);
+                    const isToday = Boolean(c.schedule_day && c.schedule_day === todayName);
 
-                      <Button
-                        variant={isCurrentActive ? 'secondary' : 'primary'}
-                        size="sm"
-                        onClick={() => {
-                          if (isCurrentActive && activeSession) {
-                            setActiveTab('scan');
-                            return;
-                          }
-                          const existingCount = sessions.filter((s) => s.class_id === c.id).length;
-                          setNewClassId(c.id);
-                          setNewSessionNumber(existingCount + 1);
-                          setNewTopic(`${c.course_name || c.course_code || 'Materi Pembelajaran'} — Pertemuan #${existingCount + 1}`);
-                          setIsOpenClassModalOpen(true);
-                        }}
+                    return (
+                      <div
+                        key={c.id}
+                        className={`p-2.5 rounded-[6px] border flex items-center justify-between gap-2 ${
+                          isCurrentActive
+                            ? 'bg-[#ECFDF5] border-[#A7F3D0]'
+                            : isToday
+                            ? 'bg-blue-50/50 border-blue-200'
+                            : 'bg-[#F8FAFC] border-[#E2E8F0]'
+                        }`}
                       >
-                        {isCurrentActive ? 'Sedang Dibuka' : 'Buka'}
-                      </Button>
-                    </div>
-                  );
-                })}
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-[#0F172A]">
+                              Kelas {c.class_code} ({c.course_name || c.course_code || 'Mata Pelajaran'})
+                            </span>
+                            {isCurrentActive && (
+                              <span className="px-1.5 py-0.5 rounded bg-[#047857] text-white text-[10px] font-bold">
+                                Sesi Aktif
+                              </span>
+                            )}
+                            {isToday && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                Hari Ini
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#64748B] tabular-nums mt-0.5">
+                            {c.schedule_day ? `${c.schedule_day}, ` : ''}{classScheduleTime(c)}{c.room ? ` · Ruang ${c.room}` : ''}
+                          </p>
+                        </div>
+
+                        <Button
+                          variant={isCurrentActive ? 'primary' : 'primary'}
+                          size="sm"
+                          onClick={() => {
+                            if (openForClass) {
+                              setActiveSession(openForClass);
+                              setSelectedSessionId(openForClass.id);
+                              fetchSelectedSessionDetail(openForClass.id);
+                              setActiveTab('scan');
+                              return;
+                            }
+                            const existingCount = sessions.filter((s) => s.class_id === c.id).length;
+                            setNewClassId(c.id);
+                            setNewSessionNumber(existingCount + 1);
+                            setNewTopic(`${c.course_name || c.course_code || 'Materi Pembelajaran'} — Pertemuan #${existingCount + 1}`);
+                            setOpenClassError('');
+                            setIsOpenClassModalOpen(true);
+                          }}
+                        >
+                          {isCurrentActive ? 'Masuk Sesi' : 'Buka'}
+                        </Button>
+                      </div>
+                    );
+                  });
+                })()}
                 {!assignedClasses.length && (
                   <p className="rounded-lg border border-dashed border-[#CBD5E1] p-3 text-[#64748B]">
                     Belum ada jadwal kelas yang dipetakan untuk akun guru ini.
@@ -701,7 +889,7 @@ export default function GuruMobilePortal({ user, onLogout }) {
                       Edit Cepat Siswa Sakit / Izin (Kelas {activeSession.class_name})
                     </span>
                     <span className="text-[11px] text-[#64748B] tabular-nums">
-                      {roster.length} Siswa
+                      {attendances.length} Siswa
                     </span>
                   </div>
                   <input
@@ -1044,20 +1232,51 @@ export default function GuruMobilePortal({ user, onLogout }) {
         }
       >
         <form onSubmit={handleOpenClassSubmit} className="space-y-3 text-xs">
+          {openClassError && (
+            <div className="p-2.5 rounded-[6px] bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+              {openClassError}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-[#0F172A] mb-1">
               Pilih Kelas
             </label>
             <select
               value={newClassId}
-              onChange={(e) => setNewClassId(e.target.value)}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setNewClassId(nextId);
+                const cls =
+                  assignedClasses.find((c) => c.id === nextId) ||
+                  allSchoolClasses.find((c) => c.id === nextId);
+                if (cls) {
+                  const existingCount = sessions.filter((s) => s.class_id === cls.id).length;
+                  setNewSessionNumber(existingCount + 1);
+                  setNewTopic(`${cls.course_name || cls.course_code || 'Materi Pembelajaran'} — Pertemuan #${existingCount + 1}`);
+                }
+              }}
               className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
             >
-              {assignedClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.class_code} — {c.course_name || c.course_code} ({c.schedule_day || 'Hari belum diatur'} {classScheduleTime(c)})
-                </option>
-              ))}
+              {assignedClasses.length > 0 && (
+                <optgroup label="Jadwal Mengajar Anda">
+                  {assignedClasses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Kelas {c.class_code} — {c.course_name || c.course_code} ({c.schedule_day || 'Hari belum diatur'} {classScheduleTime(c)})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {allSchoolClasses.filter((c) => !assignedClasses.some((ac) => ac.id === c.id)).length > 0 && (
+                <optgroup label="Kelas Lainnya di Sekolah">
+                  {allSchoolClasses
+                    .filter((c) => !assignedClasses.some((ac) => ac.id === c.id))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        Kelas {c.class_code} — {c.course_name || c.course_code} ({c.schedule_day || 'Hari belum diatur'} {classScheduleTime(c)})
+                      </option>
+                    ))}
+                </optgroup>
+              )}
             </select>
           </div>
 

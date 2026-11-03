@@ -207,7 +207,19 @@ export default function QRViewfinder({
       <div
         className={`relative aspect-4/3 w-full bg-white rounded-[10px] overflow-hidden border-2 transition-colors duration-150 flex items-center justify-center ${borderColor}`}
       >
-        {scannerMode === 'webcam' ? (
+        {!isScanning ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center space-y-2.5 bg-[#F8FAFC] w-full h-full">
+            <div className="w-11 h-11 rounded-xl bg-slate-200/80 text-slate-600 flex items-center justify-center font-bold text-sm">
+              QR
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[#0F172A]">Sesi Kelas Belum Aktif</h4>
+              <p className="text-[11px] text-[#64748B] mt-1 max-w-xs">
+                Buka sesi kelas terlebih dahulu agar kamera pemindai QR otomatis menyala.
+              </p>
+            </div>
+          </div>
+        ) : scannerMode === 'webcam' ? (
           <>
             {cameraLoading && (
               <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col items-center justify-center gap-2 z-10">

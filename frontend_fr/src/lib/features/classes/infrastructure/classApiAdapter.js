@@ -2,18 +2,25 @@ import { httpClient } from '@/lib/common/httpClient';
 import { tokenStorage } from '@/lib/common/tokenStorage';
 
 export const classApiAdapter = {
-  getAll: async ({ dosenId = '', studentId = '', search = '' } = {}) => {
+  getAll: async ({ dosenId = '', teacherName = '', studentId = '', search = '', includeAll = false } = {}) => {
     try {
       let targetDosenId = dosenId;
+      let targetTeacherName = teacherName;
       const currentUser = tokenStorage.getUser();
 
       // If user is a GURU/DOSEN and no specific dosenId filter was passed, filter by this teacher
-      if (!targetDosenId && currentUser && (currentUser.roleName === 'GURU' || currentUser.roleName === 'DOSEN')) {
+      if (!includeAll && !targetDosenId && currentUser && (currentUser.roleName === 'GURU' || currentUser.roleName === 'DOSEN')) {
         targetDosenId = currentUser.id;
+        targetTeacherName = currentUser.fullName || currentUser.full_name || currentUser.name || '';
       }
 
       const params = new URLSearchParams();
-      if (targetDosenId) params.append('dosen_id', targetDosenId);
+      if (includeAll) {
+        params.append('include_all', 'true');
+      } else {
+        if (targetDosenId) params.append('dosen_id', targetDosenId);
+        if (targetTeacherName) params.append('teacher_name', targetTeacherName);
+      }
       if (studentId) params.append('student_id', studentId);
       if (search) params.append('search', search);
 
@@ -21,11 +28,13 @@ export const classApiAdapter = {
       const res = await httpClient.get(`/school/classes${query}`);
       let list = Array.isArray(res.data) ? res.data : (res.data?.classes || []);
 
-      if (currentUser && (currentUser.roleName === 'GURU' || currentUser.roleName === 'DOSEN') && !dosenId) {
+      if (!includeAll && currentUser && (currentUser.roleName === 'GURU' || currentUser.roleName === 'DOSEN') && !dosenId) {
         const allowedCodes = currentUser.class_codes || currentUser.classCodes || [];
         const allowedIds = currentUser.class_ids || currentUser.classIds || [];
+        const normUserName = String(currentUser.fullName || currentUser.full_name || currentUser.name || '').trim().toLowerCase();
         const matched = list.filter((c) => {
           if (c.dosen_id === currentUser.id || c.teacher_id === currentUser.id) return true;
+          if (normUserName && String(c.teacher_name || '').trim().toLowerCase() === normUserName) return true;
           if (allowedCodes.includes(c.class_code)) return true;
           if (allowedIds.includes(c.id)) return true;
           return false;

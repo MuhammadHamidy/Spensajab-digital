@@ -83,18 +83,33 @@ func (r *repository) FindSessions(ctx context.Context, teacherID string, classID
 		Joins("LEFT JOIN courses ON courses.id = classes.course_id").
 		Joins("LEFT JOIN accounts ON accounts.id = class_sessions.teacher_id").
 		Joins("LEFT JOIN accounts AS class_teacher ON class_teacher.id = classes.dosen_id").
-		Order("class_sessions.created_at DESC")
+		Order("CASE WHEN class_sessions.status = 'OPEN' THEN 0 ELSE 1 END ASC, class_sessions.created_at DESC")
 
 	if teacherID != "" && teacherID != "user-admin-1" {
-		var roleID string
-		_ = r.db.WithContext(ctx).Table("accounts").Select("role_id").Where("id = ?", teacherID).Scan(&roleID).Error
-		if roleID != "role-admin" {
-			q = q.Where(`(
-				class_sessions.teacher_id = ?
-				OR classes.dosen_id = ?
-				OR classes.id IN (SELECT class_id FROM teacher_classes WHERE account_id = ?)
-				OR class_sessions.status = ?
-			)`, teacherID, teacherID, teacherID, domain.SessionStatusOpen)
+		var acc struct {
+			RoleID   string
+			FullName string
+		}
+		_ = r.db.WithContext(ctx).Table("accounts").Select("role_id, full_name").Where("id = ?", teacherID).Scan(&acc).Error
+		if acc.RoleID != "role-admin" {
+			cleanName := strings.TrimSpace(acc.FullName)
+			if cleanName != "" {
+				q = q.Where(`(
+					class_sessions.status = ?
+					OR class_sessions.teacher_id = ?
+					OR classes.dosen_id = ?
+					OR classes.id IN (SELECT tc.class_id FROM teacher_classes tc WHERE tc.teacher_id = ?)
+					OR LOWER(TRIM(COALESCE(accounts.full_name, ''))) = LOWER(?)
+					OR LOWER(TRIM(COALESCE(class_teacher.full_name, ''))) = LOWER(?)
+				)`, domain.SessionStatusOpen, teacherID, teacherID, teacherID, cleanName, cleanName)
+			} else {
+				q = q.Where(`(
+					class_sessions.status = ?
+					OR class_sessions.teacher_id = ?
+					OR classes.dosen_id = ?
+					OR classes.id IN (SELECT tc.class_id FROM teacher_classes tc WHERE tc.teacher_id = ?)
+				)`, domain.SessionStatusOpen, teacherID, teacherID, teacherID)
+			}
 		}
 	}
 	if classID != "" {
