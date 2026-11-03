@@ -272,12 +272,20 @@ export default function ClassSessionScannerPage() {
                 </h1>
                 <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                 <span className="text-xs text-[#64748B]">
-                  Mapel: {session?.topic || '-'}
+                  Mapel: {session?.course_name || session?.topic || '-'}
                 </span>
                 <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                 <span className="text-xs text-[#64748B]">
                   Guru: {session?.teacher_name || '-'}
                 </span>
+                {(session?.schedule_day || session?.schedule_time) && (
+                  <>
+                    <span className="text-[#CBD5E1] hidden sm:inline">|</span>
+                    <span className="text-xs text-[#64748B] tabular-nums">
+                      Jadwal: {[session?.schedule_day, session?.schedule_time].filter(Boolean).join(' • ')}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

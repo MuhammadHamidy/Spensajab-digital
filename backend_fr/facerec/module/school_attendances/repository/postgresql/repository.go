@@ -28,11 +28,24 @@ func normalizeClassKey(value string) string {
 	return s
 }
 
+const sessionSelectFields = `
+	class_sessions.*,
+	classes.class_code AS class_name,
+	classes.course_id AS course_id,
+	COALESCE(courses.name, '') AS course_name,
+	COALESCE(courses.code, '') AS course_code,
+	COALESCE(classes.schedule_day, '') AS schedule_day,
+	COALESCE(NULLIF(classes.schedule_time, ''), CONCAT_WS(' - ', NULLIF(classes.schedule_start_time, ''), NULLIF(classes.schedule_end_time, ''))) AS schedule_time,
+	COALESCE(classes.room, '') AS room,
+	COALESCE(accounts.full_name, class_teacher.full_name) AS teacher_name
+`
+
 func (r *repository) FindSessionByID(ctx context.Context, sessionID string) (*domain.ClassSession, error) {
 	var s domain.ClassSession
 	err := r.db.WithContext(ctx).Table("class_sessions").
-		Select("class_sessions.*, classes.class_code as class_name, COALESCE(accounts.full_name, class_teacher.full_name) as teacher_name").
+		Select(sessionSelectFields).
 		Joins("LEFT JOIN classes ON classes.id = class_sessions.class_id").
+		Joins("LEFT JOIN courses ON courses.id = classes.course_id").
 		Joins("LEFT JOIN accounts ON accounts.id = class_sessions.teacher_id").
 		Joins("LEFT JOIN accounts AS class_teacher ON class_teacher.id = classes.dosen_id").
 		Where("class_sessions.id = ?", sessionID).
@@ -46,8 +59,9 @@ func (r *repository) FindSessionByID(ctx context.Context, sessionID string) (*do
 func (r *repository) FindActiveSessionByClass(ctx context.Context, classID string) (*domain.ClassSession, error) {
 	var s domain.ClassSession
 	err := r.db.WithContext(ctx).Table("class_sessions").
-		Select("class_sessions.*, classes.class_code as class_name, COALESCE(accounts.full_name, class_teacher.full_name) as teacher_name").
+		Select(sessionSelectFields).
 		Joins("LEFT JOIN classes ON classes.id = class_sessions.class_id").
+		Joins("LEFT JOIN courses ON courses.id = classes.course_id").
 		Joins("LEFT JOIN accounts ON accounts.id = class_sessions.teacher_id").
 		Joins("LEFT JOIN accounts AS class_teacher ON class_teacher.id = classes.dosen_id").
 		Where("class_sessions.class_id = ? AND class_sessions.status = ?", classID, domain.SessionStatusOpen).
@@ -64,8 +78,9 @@ func (r *repository) FindActiveSessionByClass(ctx context.Context, classID strin
 func (r *repository) FindSessions(ctx context.Context, teacherID string, classID string, status string) ([]*domain.ClassSession, error) {
 	list := make([]*domain.ClassSession, 0)
 	q := r.db.WithContext(ctx).Table("class_sessions").
-		Select("class_sessions.*, classes.class_code as class_name, COALESCE(accounts.full_name, class_teacher.full_name) as teacher_name").
+		Select(sessionSelectFields).
 		Joins("LEFT JOIN classes ON classes.id = class_sessions.class_id").
+		Joins("LEFT JOIN courses ON courses.id = classes.course_id").
 		Joins("LEFT JOIN accounts ON accounts.id = class_sessions.teacher_id").
 		Joins("LEFT JOIN accounts AS class_teacher ON class_teacher.id = classes.dosen_id").
 		Order("class_sessions.created_at DESC")
@@ -381,8 +396,9 @@ func (r *repository) GetAttendanceReport(ctx context.Context, filter domain.Atte
 func (r *repository) GetLiveOpenSessions(ctx context.Context) ([]*domain.ClassSession, error) {
 	list := make([]*domain.ClassSession, 0)
 	err := r.db.WithContext(ctx).Table("class_sessions").
-		Select("class_sessions.*, classes.class_code as class_name, COALESCE(accounts.full_name, class_teacher.full_name) as teacher_name").
+		Select(sessionSelectFields).
 		Joins("LEFT JOIN classes ON classes.id = class_sessions.class_id").
+		Joins("LEFT JOIN courses ON courses.id = classes.course_id").
 		Joins("LEFT JOIN accounts ON accounts.id = class_sessions.teacher_id").
 		Joins("LEFT JOIN accounts AS class_teacher ON class_teacher.id = classes.dosen_id").
 		Where("class_sessions.status = ?", domain.SessionStatusOpen).
@@ -436,6 +452,22 @@ func (r *repository) FindAllClasses(ctx context.Context) ([]*domain.Class, error
 
 func (r *repository) CreateClass(ctx context.Context, class *domain.Class) error {
 	class.ClassCode = strings.TrimSpace(class.ClassCode)
+	normalizedCode := normalizeClassKey(class.ClassCode)
+
+	if strings.TrimSpace(class.ScheduleDay) != "" {
+		var existingID string
+		q := r.db.WithContext(ctx).Table("classes").
+			Select("id").
+			Where("course_id = ? AND UPPER(REPLACE(REPLACE(class_code, '-', ''), ' ', '')) = ? AND COALESCE(schedule_day, '') = ''", class.CourseID, normalizedCode)
+		if class.TeacherID != "" {
+			q = q.Where("(COALESCE(dosen_id, '') = '' OR dosen_id = ?)", class.TeacherID)
+		}
+		if err := q.Limit(1).Scan(&existingID).Error; err == nil && existingID != "" {
+			class.ID = existingID
+			return r.UpdateClass(ctx, class)
+		}
+	}
+
 	err := r.db.WithContext(ctx).Table("classes").Create(map[string]interface{}{
 		"id":                  class.ID,
 		"course_id":           class.CourseID,

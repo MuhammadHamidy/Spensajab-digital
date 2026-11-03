@@ -202,6 +202,19 @@ func (h *SchoolAttendanceHandler) GetClasses(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(responses.Fail("INTERNAL_ERROR", err.Error()))
 	}
+	teacherFilter := c.Query("dosen_id")
+	if teacherFilter == "" {
+		teacherFilter = c.Query("teacher_id")
+	}
+	if teacherFilter != "" && teacherFilter != "user-admin-1" {
+		filtered := make([]*domain.Class, 0)
+		for _, item := range list {
+			if item.TeacherID == teacherFilter || item.DosenID == teacherFilter {
+				filtered = append(filtered, item)
+			}
+		}
+		list = filtered
+	}
 	return c.Status(http.StatusOK).JSON(responses.Success(list, "Daftar kelas berhasil dimuat"))
 }
 

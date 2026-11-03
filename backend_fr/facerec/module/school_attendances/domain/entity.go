@@ -30,6 +30,12 @@ type ClassSession struct {
 	ID            string     `json:"id" gorm:"primaryKey;type:varchar(36)"`
 	ClassID       string     `json:"class_id" gorm:"type:varchar(36);not null"`
 	ClassName     string     `json:"class_name" gorm:"->"`
+	CourseID      string     `json:"course_id" gorm:"->"`
+	CourseName    string     `json:"course_name" gorm:"->"`
+	CourseCode    string     `json:"course_code" gorm:"->"`
+	ScheduleDay   string     `json:"schedule_day" gorm:"->"`
+	ScheduleTime  string     `json:"schedule_time" gorm:"->"`
+	Room          string     `json:"room" gorm:"->"`
 	TeacherID     *string    `json:"teacher_id" gorm:"type:varchar(36)"`
 	TeacherName   string     `json:"teacher_name" gorm:"->"`
 	SessionNumber int        `json:"session_number" gorm:"not null"`

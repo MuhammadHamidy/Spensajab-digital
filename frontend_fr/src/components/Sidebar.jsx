@@ -117,7 +117,10 @@ export default function Sidebar() {
 
   const isCurrentActive = (href) => {
     if (href === '/') return pathname === '/';
-    return pathname === href || pathname.startsWith(href);
+    if (href === '/attendance') {
+      return pathname === '/attendance' || pathname.startsWith('/attendance/session');
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import Button from '@/components/Button';
 import { accountApiAdapter } from '@/lib/features/auth/infrastructure/accountApiAdapter';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
@@ -84,7 +85,7 @@ export default function ScheduleMappingPage() {
 
   const openCreate = () => {
     setError('');
-    setForm({ ...EMPTY_FORM, academic_year: String(new Date().getFullYear()) });
+    setForm({ ...EMPTY_FORM, academic_year: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` });
     setEditing(null);
     setShowForm(true);
   };
@@ -96,7 +97,7 @@ export default function ScheduleMappingPage() {
       course_id: item.course_id || '',
       teacher_id: item.teacher_id || item.dosen_id || '',
       class_code: item.class_code || '',
-      academic_year: item.academic_year || '',
+      academic_year: item.academic_year || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
       room: item.room || '',
       schedule_day: item.schedule_day || '',
       schedule_start_time: toTimeInput(item.schedule_start_time || item.schedule_time),
@@ -118,7 +119,7 @@ export default function ScheduleMappingPage() {
       const payload = {
         ...form,
         schedule_time: `${form.schedule_start_time} - ${form.schedule_end_time}`,
-        academic_year: form.academic_year || String(new Date().getFullYear()),
+        academic_year: form.academic_year || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
       };
       if (editing) {
         await classApiAdapter.update(editing.id, payload);
@@ -145,13 +146,13 @@ export default function ScheduleMappingPage() {
 
   const renderMapping = (item) => (
     <div key={item.id} className="rounded-lg border border-blue-100 bg-blue-50 p-2 text-[11px]">
-      <p className="font-bold text-blue-900">{item.class_code}</p>
+      <p className="font-bold text-blue-900">Kelas {item.class_code}</p>
       <p className="text-blue-800">{item.course_name || item.course_code || 'Mata pelajaran'}</p>
       <p className="text-slate-600">{item.teacher_name || 'Guru belum ditentukan'}</p>
       {item.room && <p className="text-slate-500">Ruang {item.room}</p>}
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={() => openEdit(item)} className="font-semibold text-blue-700">Edit</button>
-        <button type="button" onClick={() => deleteMapping(item)} className="font-semibold text-rose-700">Hapus</button>
+        <button type="button" onClick={() => openEdit(item)} className="font-semibold text-blue-700 cursor-pointer">Edit</button>
+        <button type="button" onClick={() => deleteMapping(item)} className="font-semibold text-rose-700 cursor-pointer">Hapus</button>
       </div>
     </div>
   );
@@ -162,10 +163,15 @@ export default function ScheduleMappingPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Pemetaan Jadwal Mata Pelajaran</h1>
           <p className="mt-1 text-xs text-slate-500">
-            Atur mapel, guru, rombel, hari, dan jam. Satu guru dapat mengampu beberapa rombel pada hari yang berbeda.
+            Atur mapel, guru, rombel, hari, dan jam. Pemetaan ini otomatis digunakan pada menu Presensi QR Kelas.
           </p>
         </div>
-        <Button variant="primary" size="md" onClick={openCreate}>Tambah Pemetaan</Button>
+        <div className="flex items-center gap-2.5">
+          <Link href="/attendance">
+            <Button variant="secondary" size="md">Ke Presensi QR Kelas</Button>
+          </Link>
+          <Button variant="primary" size="md" onClick={openCreate}>+ Tambah Pemetaan</Button>
+        </div>
       </div>
 
       {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
@@ -174,17 +180,16 @@ export default function ScheduleMappingPage() {
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 p-4">
           <div>
             <h2 className="font-semibold text-slate-900">Jadwal Mingguan</h2>
-            <p className="mt-1 text-[11px] text-slate-500">Setiap kartu menampilkan guru berdasarkan nama lengkap dari backend.</p>
+            <p className="mt-1 text-[11px] text-slate-500">Setiap kartu menampilkan rombel, mata pelajaran, dan guru pengampu yang terhubung ke Presensi QR Kelas.</p>
           </div>
           <label className="w-full text-xs font-semibold text-slate-700 sm:w-72">
-            Pilih Guru Pengampu
+            Filter Guru Pengampu
             <select
-              required
               value={selectedTeacherId}
               onChange={(event) => setSelectedTeacherId(event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 font-normal"
             >
-              <option value="">Pilih guru terlebih dahulu</option>
+              <option value="">Semua Guru Pengampu</option>
               {teachers.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
                   {teacher.full_name || teacher.name || teacher.username}
@@ -193,11 +198,7 @@ export default function ScheduleMappingPage() {
             </select>
           </label>
         </div>
-        {!selectedTeacherId ? (
-          <div className="p-8 text-center text-sm text-slate-500">
-            Silakan pilih guru pengampu terlebih dahulu untuk melihat pemetaan jadwalnya.
-          </div>
-        ) : <table className="w-full min-w-[900px] table-fixed text-left text-xs">
+        <table className="w-full min-w-[900px] table-fixed text-left text-xs">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="w-32 border-r border-slate-200 p-3">Jam</th>
@@ -207,7 +208,7 @@ export default function ScheduleMappingPage() {
           <tbody className="divide-y divide-slate-100">
             {timeSlots.map((time) => (
               <tr key={time} className="align-top">
-                <td className="border-r border-slate-200 p-3 font-semibold text-slate-700">{time}</td>
+                <td className="border-r border-slate-200 p-3 font-semibold text-slate-700 tabular-nums">{time}</td>
                 {DAYS.map((day) => (
                   <td key={day} className="border-r border-slate-100 p-2">
                     <div className="space-y-2">{filteredClasses.filter((item) => timeRange(item) === time && item.schedule_day === day).map(renderMapping)}</div>
@@ -215,14 +216,20 @@ export default function ScheduleMappingPage() {
                 ))}
               </tr>
             ))}
-            {!timeSlots.length && <tr><td colSpan={DAYS.length + 1} className="p-8 text-center text-slate-500">Belum ada pemetaan jadwal.</td></tr>}
+            {!timeSlots.length && (
+              <tr>
+                <td colSpan={DAYS.length + 1} className="p-8 text-center text-slate-500">
+                  Belum ada pemetaan jadwal dengan hari &amp; jam. Klik &quot;+ Tambah Pemetaan&quot; atau &quot;Edit&quot; pada daftar di bawah.
+                </td>
+              </tr>
+            )}
           </tbody>
-        </table>}
+        </table>
       </section>
 
-      {selectedTeacherId && <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 p-4">
-          <h2 className="font-semibold text-slate-900">Daftar Pemetaan</h2>
+      <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 p-4 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900">Daftar Pemetaan Jadwal ({filteredClasses.length})</h2>
         </div>
         <table className="w-full min-w-[850px] text-left text-xs">
           <thead className="bg-slate-50 text-slate-600">
@@ -233,25 +240,25 @@ export default function ScheduleMappingPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredClasses.map((item) => (
-              <tr key={item.id}>
+              <tr key={item.id} className="hover:bg-slate-50/70">
                 <td className="p-3 font-semibold">{item.course_name || item.course_code || '-'}</td>
                 <td className="p-3">{item.teacher_name || 'Guru belum ditentukan'}</td>
-                <td className="p-3">{item.class_code || '-'}</td>
-                <td className="p-3">{item.schedule_day || '-'}</td>
-                <td className="p-3">{timeRange(item) || '-'}</td>
+                <td className="p-3 font-semibold text-blue-700">Kelas {item.class_code || '-'}</td>
+                <td className="p-3">{item.schedule_day || <span className="text-amber-600 font-medium">Belum diatur</span>}</td>
+                <td className="p-3 tabular-nums">{timeRange(item) || <span className="text-amber-600 font-medium">Belum diatur</span>}</td>
                 <td className="p-3">{item.room || '-'}</td>
                 <td className="p-3 text-right">
                   <div className="flex justify-end gap-3">
-                    <button type="button" onClick={() => openEdit(item)} className="font-semibold text-blue-700">Edit</button>
-                    <button type="button" onClick={() => deleteMapping(item)} className="font-semibold text-rose-700">Hapus</button>
+                    <button type="button" onClick={() => openEdit(item)} className="font-semibold text-blue-700 cursor-pointer">Edit</button>
+                    <button type="button" onClick={() => deleteMapping(item)} className="font-semibold text-rose-700 cursor-pointer">Hapus</button>
                   </div>
                 </td>
               </tr>
             ))}
-            {!filteredClasses.length && <tr><td colSpan="7" className="p-6 text-center text-slate-500">Belum ada pemetaan untuk guru yang dipilih.</td></tr>}
+            {!filteredClasses.length && <tr><td colSpan="7" className="p-6 text-center text-slate-500">Belum ada pemetaan jadwal.</td></tr>}
           </tbody>
         </table>
-      </section>}
+      </section>
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
@@ -271,7 +278,7 @@ export default function ScheduleMappingPage() {
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-xs font-semibold">Rombel
-                <input required placeholder="Contoh: VII-A" value={form.class_code} onChange={(event) => setForm({ ...form, class_code: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
+                <input required placeholder="Contoh: 7A" value={form.class_code} onChange={(event) => setForm({ ...form, class_code: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
               </label>
               <label className="block text-xs font-semibold">Tahun Ajaran
                 <input required placeholder="Contoh: 2026/2027" value={form.academic_year} onChange={(event) => setForm({ ...form, academic_year: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
@@ -288,7 +295,7 @@ export default function ScheduleMappingPage() {
                 <input required type="time" value={form.schedule_end_time || ''} onChange={(event) => setForm({ ...form, schedule_end_time: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
               </label>
               <label className="block text-xs font-semibold sm:col-span-2">Ruangan
-                <input placeholder="Contoh: Ruang VII-A" value={form.room} onChange={(event) => setForm({ ...form, room: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
+                <input placeholder="Contoh: Ruang 7A" value={form.room} onChange={(event) => setForm({ ...form, room: event.target.value })} className="mt-1 w-full rounded-lg border p-2 font-normal" />
               </label>
             </div>
             <div className="flex justify-end gap-2">

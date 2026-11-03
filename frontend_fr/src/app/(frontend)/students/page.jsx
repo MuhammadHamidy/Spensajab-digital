@@ -13,6 +13,8 @@ export default function StudentsQRManagementPage() {
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [search, setSearch] = useState('');
   const [selectedCardForModal, setSelectedCardForModal] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
 
   // Modal Tambah Siswa
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -62,14 +64,48 @@ export default function StudentsQRManagementPage() {
     [students]
   );
 
-  const filtered = students.filter((s) => {
-    const matchClass = selectedClass === 'ALL' || s.className === selectedClass;
-    const matchSearch =
-      !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.nisn.includes(search);
-    return matchClass && matchSearch;
-  });
+  const filtered = useMemo(
+    () =>
+      students.filter((s) => {
+        const matchClass = selectedClass === 'ALL' || s.className === selectedClass;
+        const matchSearch =
+          !search ||
+          s.name.toLowerCase().includes(search.toLowerCase()) ||
+          s.nisn.includes(search);
+        return matchClass && matchSearch;
+      }),
+    [students, selectedClass, search]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClass, search, pageSize]);
+
+  const effectivePageSize = pageSize === 'ALL' ? Math.max(1, filtered.length) : Number(pageSize) || 9;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * effectivePageSize;
+  const endIndex = Math.min(startIndex + effectivePageSize, filtered.length);
+  const paginatedStudents = useMemo(
+    () => (pageSize === 'ALL' ? filtered : filtered.slice(startIndex, endIndex)),
+    [filtered, pageSize, startIndex, endIndex]
+  );
+
+  const visiblePageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+    }
+    const pages = [1];
+    const start = Math.max(2, safeCurrentPage - 1);
+    const end = Math.min(totalPages - 1, safeCurrentPage + 1);
+    if (start > 2) pages.push('...');
+    for (let p = start; p <= end; p += 1) {
+      pages.push(p);
+    }
+    if (end < totalPages - 1) pages.push('...');
+    pages.push(totalPages);
+    return pages;
+  }, [totalPages, safeCurrentPage]);
 
   const handlePrint = () => {
     window.print();
@@ -209,6 +245,38 @@ export default function StudentsQRManagementPage() {
         </div>
       </div>
 
+      {/* Info Jumlah & Pilihan Per Halaman */}
+      {!isLoading && filtered.length > 0 && (
+        <div className="bg-white border border-slate-200/90 px-4 py-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 shadow-xs print:hidden">
+          <div className="tabular-nums">
+            Menampilkan <strong className="text-slate-900">{startIndex + 1}</strong>–
+            <strong className="text-slate-900">{endIndex}</strong> dari{' '}
+            <strong className="text-slate-900">{filtered.length}</strong> siswa
+            {selectedClass !== 'ALL' && (
+              <span className="ml-1 text-blue-600 font-semibold">(Kelas {selectedClass})</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="students-page-size" className="font-semibold text-slate-600">
+              Tampilkan per halaman:
+            </label>
+            <select
+              id="students-page-size"
+              value={pageSize}
+              onChange={(e) => setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+              className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            >
+              <option value={9}>9 Kartu</option>
+              <option value={18}>18 Kartu</option>
+              <option value={36}>36 Kartu</option>
+              <option value={72}>72 Kartu</option>
+              <option value="ALL">Semua ({filtered.length} Kartu)</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Grid Kartu Siswa (Print Layout Grid A4 / ID Card) */}
       {isLoading ? (
         <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center text-xs text-slate-500">
@@ -220,81 +288,134 @@ export default function StudentsQRManagementPage() {
           <p>Tambahkan siswa melalui tombol &quot;Tambah Siswa&quot; di atas atau unggah Excel pada menu Import Data.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-2 print:gap-4">
-          {filtered.map((student) => (
-            <div
-              key={student.id}
-              className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all print:border-black print:text-black print:rounded-lg print:shadow-none"
-            >
-              {/* Header Kartu dengan Logo Resmi */}
-              <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3 print:border-gray-300">
-                <div className="flex items-center gap-2.5">
-                  <div className="student-card-logo w-9 h-9 rounded-lg bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0">
-                    <Image
-                      src="/image/logo-jabon.png"
-                      alt="Logo SMPN 1 Jabon"
-                      width={32}
-                      height={32}
-                      className="object-contain"
-                    />
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-2 print:gap-4">
+            {paginatedStudents.map((student) => (
+              <div
+                key={student.id}
+                className="student-qr-card bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:shadow-md transition-all print:border-black print:text-black print:rounded-lg print:shadow-none"
+              >
+                {/* Header Kartu dengan Logo Resmi */}
+                <div className="print-card-header flex items-center justify-between border-b border-slate-100 pb-3 print:border-gray-300">
+                  <div className="flex items-center gap-2.5">
+                    <div className="student-card-logo w-9 h-9 rounded-lg bg-white border border-slate-200/80 p-0.5 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/image/logo-jabon.png"
+                        alt="Logo SMPN 1 Jabon"
+                        width={32}
+                        height={32}
+                        className="object-contain"
+                      />
+                    </div>
+                    <div>
+                      <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block print:text-black">
+                        SMP NEGERI 1 JABON
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900 print:text-black leading-tight truncate max-w-[170px]">
+                        {student.name}
+                      </h3>
+                      <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums print:text-gray-700">
+                        NISN: {student.nisn}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="student-card-school text-[10px] font-bold text-blue-600 tracking-wider uppercase block print:text-black">
-                      SMP NEGERI 1 JABON
+
+                  <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold print:border-black print:bg-white print:text-black">
+                    {student.className}
+                  </span>
+                </div>
+
+                {/* Area QR Code */}
+                <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
+                    alt={`QR ${student.name}`}
+                    className="w-32 h-32 object-contain rounded-md"
+                    onError={(e) => {
+                      e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
+                    }}
+                  />
+                  <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums print:text-black">
+                    Token: {student.qrToken.slice(0, 18)}...
+                  </span>
+                </div>
+
+                {/* Footer Kartu */}
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 print:hidden">
+                  <span className="text-slate-500 font-medium">{student.gender}</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteStudent(student)}
+                      className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                    >
+                      Hapus
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCardForModal(student)}
+                      className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                    >
+                      Detail Token →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Navigasi Halaman (Paging) */}
+          {totalPages > 1 && (
+            <div className="bg-white border border-slate-200/90 p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-xs print:hidden">
+              <span className="text-xs text-slate-600 tabular-nums">
+                Halaman <strong className="text-slate-900">{safeCurrentPage}</strong> dari{' '}
+                <strong className="text-slate-900">{totalPages}</strong>
+              </span>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  ← Sebelumnya
+                </button>
+
+                {visiblePageNumbers.map((pageNum, idx) =>
+                  pageNum === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-400">
+                      ...
                     </span>
-                    <h3 className="text-sm font-bold text-slate-900 print:text-black leading-tight truncate max-w-[170px]">
-                      {student.name}
-                    </h3>
-                    <p className="student-card-nisn text-[11px] text-slate-500 tabular-nums print:text-gray-700">
-                      NISN: {student.nisn}
-                    </p>
-                  </div>
-                </div>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-[32px] px-2.5 py-1.5 rounded-lg text-xs font-semibold tabular-nums transition-all cursor-pointer ${
+                        safeCurrentPage === pageNum
+                          ? 'bg-[#1E4DBD] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
 
-                <span className="student-card-class px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold print:border-black print:bg-white print:text-black">
-                  {student.className}
-                </span>
-              </div>
-
-              {/* Area QR Code */}
-              <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
-                  alt={`QR ${student.name}`}
-                  className="w-32 h-32 object-contain rounded-md"
-                  onError={(e) => {
-                    e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${student.qrToken}`;
-                  }}
-                />
-                <span className="student-card-token text-[11px] text-slate-500 font-mono mt-2 tabular-nums print:text-black">
-                  Token: {student.qrToken.slice(0, 18)}...
-                </span>
-              </div>
-
-              {/* Footer Kartu */}
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 print:hidden">
-                <span className="text-slate-500 font-medium">{student.gender}</span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteStudent(student)}
-                    className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-                  >
-                    Hapus
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCardForModal(student)}
-                    className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
-                  >
-                    Detail Token →
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Berikutnya →
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* Modal Tambah Siswa */}

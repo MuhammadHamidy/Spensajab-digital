@@ -8,51 +8,68 @@ import { attendanceApi } from '@/lib/attendanceApi';
 export default function AdminMonitoringPage() {
   const [liveSessions, setLiveSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
-  const fetchLiveMonitoring = async () => {
-    const res = await attendanceApi.getLiveMonitoring();
-    if (res.success && res.data) {
-      setLiveSessions(res.data);
-    } else {
-      setLiveSessions([]);
+  const fetchLiveMonitoring = async (manual = false) => {
+    if (manual) setIsRefreshing(true);
+    try {
+      const res = await attendanceApi.getLiveMonitoring();
+      if (res.success && res.data) {
+        setLiveSessions(res.data);
+      } else {
+        setLiveSessions([]);
+      }
+      setLastRefreshed(new Date());
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-    setLastRefreshed(new Date());
-    setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchLiveMonitoring();
-    const interval = setInterval(fetchLiveMonitoring, 10000);
+    fetchLiveMonitoring(false);
+    const interval = setInterval(() => fetchLiveMonitoring(false), 10000);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-        <div className="border-b border-[#E2E8F0] pb-4 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-[#0F172A]">
-              Monitoring Presensi Kelas
-            </h1>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              Pantau seluruh ruang kelas yang sedang membuka sesi presensi secara terpusat.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-[#64748B] tabular-nums">
-              Update: {lastRefreshed.toLocaleTimeString('id-ID')}
-            </span>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={fetchLiveMonitoring}
-            >
-              Perbarui
-            </Button>
-          </div>
+      <div className="border-b border-[#E2E8F0] pb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-[#0F172A]">
+            Monitoring Presensi Kelas
+          </h1>
+          <p className="text-xs text-[#64748B] mt-0.5">
+            Pantau seluruh ruang kelas yang sedang membuka sesi presensi secara terpusat.
+          </p>
         </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-[#64748B] tabular-nums">
+            Update: {lastRefreshed.toLocaleTimeString('id-ID')}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={isRefreshing}
+            onClick={() => fetchLiveMonitoring(true)}
+            startIcon={
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            }
+          >
+            Perbarui
+          </Button>
+          <Link href="/attendance">
+            <Button variant="primary" size="sm">
+              Ke Presensi QR Kelas
+            </Button>
+          </Link>
+        </div>
+      </div>
 
         {/* Sesi Presensi yang Sedang Berjalan */}
         {liveSessions.length > 0 ? (
@@ -92,11 +109,16 @@ export default function AdminMonitoringPage() {
 
                     <div>
                       <h3 className="text-sm font-semibold text-[#0F172A] leading-snug">
-                        {ls.topic}
+                        {ls.course_name ? `${ls.course_name} — ${ls.topic}` : ls.topic}
                       </h3>
                       <p className="text-xs text-[#64748B] mt-0.5">
-                        Guru: {ls.teacher_name}
+                        Guru: {ls.teacher_name || '-'}
                       </p>
+                      {(ls.schedule_day || ls.schedule_time) && (
+                        <p className="text-[11px] text-[#64748B] mt-0.5 tabular-nums">
+                          Jadwal: {[ls.schedule_day, ls.schedule_time].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -124,22 +146,31 @@ export default function AdminMonitoringPage() {
 
                   <Link
                     href={`/attendance/session/${ls.id}`}
-                    className="w-full py-2 rounded-[6px] bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#CBD5E1] text-[#0F172A] text-xs font-semibold text-center transition-colors block"
+                    className="w-full py-2 rounded-[6px] bg-[#1E4DBD] hover:bg-[#193D9B] text-white text-xs font-semibold text-center transition-colors block"
                   >
-                    Pantau Roster Kelas
+                    Pantau Roster Kelas →
                   </Link>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="bg-white border border-[#E2E8F0] rounded-[10px] p-12 text-center text-[#64748B] text-xs space-y-1">
-            <h3 className="text-sm font-semibold text-[#0F172A]">
-              Tidak Ada Kelas Yang Sedang Terbuka
-            </h3>
-            <p>
-              Saat guru membuka sesi presensi kelas, status real-time akan langsung terpantau di sini.
-            </p>
+          <div className="bg-white border border-[#E2E8F0] rounded-[10px] p-12 text-center text-[#64748B] text-xs space-y-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-[#0F172A]">
+                Tidak Ada Kelas Yang Sedang Terbuka
+              </h3>
+              <p>
+                Saat guru membuka sesi presensi kelas, status real-time akan langsung terpantau di sini.
+              </p>
+            </div>
+            <div>
+              <Link href="/attendance">
+                <Button variant="primary" size="sm">
+                  Buka Sesi Presensi sesuai Jadwal →
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
       </div>

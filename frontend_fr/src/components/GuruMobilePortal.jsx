@@ -73,9 +73,21 @@ export default function GuruMobilePortal({ user, onLogout }) {
 
   const fetchAssignedClasses = useCallback(async () => {
     if (!user?.id) return;
-    const classList = await classApiAdapter.getAll({ dosenId: user.id });
-    setAssignedClasses(classList);
-    setNewClassId((current) => current || classList[0]?.id || '');
+    const rawList = await classApiAdapter.getAll({ dosenId: user.id });
+    const list = Array.isArray(rawList) ? rawList : [];
+    const hasScheduledSibling = new Set(
+      list
+        .filter((c) => c.schedule_day || c.schedule_time || c.schedule_start_time)
+        .map((c) => `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`)
+    );
+    const cleanedList = list.filter((c) => {
+      const isScheduled = Boolean(c.schedule_day || c.schedule_time || c.schedule_start_time);
+      if (isScheduled) return true;
+      const key = `${c.course_id || ''}__${(c.class_code || '').toUpperCase()}`;
+      return !hasScheduledSibling.has(key);
+    });
+    setAssignedClasses(cleanedList);
+    setNewClassId((current) => current || cleanedList[0]?.id || '');
   }, [user?.id]);
 
   useEffect(() => {
@@ -495,11 +507,11 @@ export default function GuruMobilePortal({ user, onLogout }) {
               </div>
             </div>
 
-            {/* Jadwal Mengajar Guru Hari Ini */}
+            {/* Jadwal Mengajar Guru (Sesuai Pemetaan Jadwal) */}
             <div className="bg-white border border-[#E2E8F0] rounded-[10px] p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
                 <h3 className="text-xs font-semibold text-[#0F172A]">
-                  Jadwal Mengajar Hari Ini
+                  Jadwal Mengajar Terpetakan
                 </h3>
                 <span className="text-[11px] text-[#64748B]">
                   {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -507,41 +519,58 @@ export default function GuruMobilePortal({ user, onLogout }) {
               </div>
 
               <div className="space-y-2 text-xs">
-                {assignedClasses.filter((c) => !c.schedule_day || c.schedule_day === new Date().toLocaleDateString('id-ID', { weekday: 'long' })).map((c) => (
-                  <div
-                    key={c.id}
-                    className="p-2.5 rounded-[6px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between"
-                  >
-                    <div>
-                      <span className="font-semibold text-[#0F172A]">
-                        Kelas {c.class_code} ({c.course_name || c.course_code})
-                      </span>
-                      <p className="text-[11px] text-[#64748B] tabular-nums mt-0.5">
-                        {classScheduleTime(c)} {c.room ? `· Ruang ${c.room}` : ''}
-                      </p>
-                    </div>
+                {assignedClasses.map((c) => {
+                  const isCurrentActive =
+                    activeSession?.class_id === c.id || activeSession?.class_name === c.class_code;
+                  const todayName = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
+                  const isToday = Boolean(c.schedule_day && c.schedule_day === todayName);
 
-                    <Button
-                      variant={activeSession?.class_name === c.code ? 'secondary' : 'primary'}
-                      size="sm"
-                      onClick={() => {
-                        setNewClassId(c.id);
-                        setNewTopic(`${c.course_name || c.course_code} Pertemuan`);
-                        setIsOpenClassModalOpen(true);
-                      }}
+                  return (
+                    <div
+                      key={c.id}
+                      className={`p-2.5 rounded-[6px] border flex items-center justify-between gap-2 ${
+                        isToday ? 'bg-blue-50/50 border-blue-200' : 'bg-[#F8FAFC] border-[#E2E8F0]'
+                      }`}
                     >
-                      {activeSession?.class_name === c.code ? 'Sedang Dibuka' : 'Buka'}
-                    </Button>
-                  </div>
-                ))}
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-[#0F172A]">
+                            Kelas {c.class_code} ({c.course_name || c.course_code || 'Mata Pelajaran'})
+                          </span>
+                          {isToday && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              Hari Ini
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#64748B] tabular-nums mt-0.5">
+                          {c.schedule_day ? `${c.schedule_day}, ` : ''}{classScheduleTime(c)}{c.room ? ` · Ruang ${c.room}` : ''}
+                        </p>
+                      </div>
+
+                      <Button
+                        variant={isCurrentActive ? 'secondary' : 'primary'}
+                        size="sm"
+                        onClick={() => {
+                          if (isCurrentActive && activeSession) {
+                            setActiveTab('scan');
+                            return;
+                          }
+                          const existingCount = sessions.filter((s) => s.class_id === c.id).length;
+                          setNewClassId(c.id);
+                          setNewSessionNumber(existingCount + 1);
+                          setNewTopic(`${c.course_name || c.course_code || 'Materi Pembelajaran'} — Pertemuan #${existingCount + 1}`);
+                          setIsOpenClassModalOpen(true);
+                        }}
+                      >
+                        {isCurrentActive ? 'Sedang Dibuka' : 'Buka'}
+                      </Button>
+                    </div>
+                  );
+                })}
                 {!assignedClasses.length && (
                   <p className="rounded-lg border border-dashed border-[#CBD5E1] p-3 text-[#64748B]">
                     Belum ada jadwal kelas yang dipetakan untuk akun guru ini.
-                  </p>
-                )}
-                {assignedClasses.length > 0 && !assignedClasses.some((c) => !c.schedule_day || c.schedule_day === new Date().toLocaleDateString('id-ID', { weekday: 'long' })) && (
-                  <p className="rounded-lg border border-dashed border-[#CBD5E1] p-3 text-[#64748B]">
-                    Tidak ada jadwal mengajar untuk hari ini.
                   </p>
                 )}
               </div>
