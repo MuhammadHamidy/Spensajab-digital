@@ -31,7 +31,16 @@ export default function AttendanceDashboardPage() {
   // Filter Pemetaan Jadwal
   const todayDay = useMemo(() => getTodayIndonesianDay(), []);
   const [selectedDayFilter, setSelectedDayFilter] = useState('ALL');
+  const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [scheduleSearch, setScheduleSearch] = useState('');
+
+  // Modal Edit Sesi
+  const [editingSession, setEditingSession] = useState(null);
+  const [editTopic, setEditTopic] = useState('');
+  const [editSessionNumber, setEditSessionNumber] = useState(1);
+  const [editDate, setEditDate] = useState('');
+  const [editStatus, setEditStatus] = useState('OPEN');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Modal Buka Kelas Baru
   const [isOpenModalActive, setIsOpenModalActive] = useState(false);
@@ -169,6 +178,63 @@ export default function AttendanceDashboardPage() {
   const activeSessions = sessions.filter((s) => s.status === 'OPEN');
   const closedSessions = sessions.filter((s) => s.status === 'CLOSED');
 
+  const openEditSessionModal = (sess) => {
+    setEditingSession(sess);
+    setEditTopic(sess.topic || '');
+    setEditSessionNumber(sess.session_number || 1);
+    setEditDate(String(sess.date || '').slice(0, 10));
+    setEditStatus(sess.status || 'OPEN');
+  };
+
+  const handleSaveEditSession = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingSession) return;
+    setIsSavingEdit(true);
+    const res = await attendanceApi.editSession(editingSession.id, {
+      class_id: editingSession.class_id,
+      topic: editTopic,
+      session_number: Number(editSessionNumber) || 1,
+      date: editDate,
+      status: editStatus,
+    });
+    setIsSavingEdit(false);
+    if (res.success) {
+      setEditingSession(null);
+      fetchSessions();
+    } else {
+      alert(res.error?.message || 'Gagal memperbarui sesi kelas');
+    }
+  };
+
+  const handleDeleteSession = async (sess) => {
+    if (
+      !window.confirm(
+        `Hapus sesi Kelas ${sess.class_name} (${sess.topic}) beserta seluruh data presensinya?`
+      )
+    ) {
+      return;
+    }
+    const res = await attendanceApi.deleteSession(sess.id);
+    if (res.success) {
+      fetchSessions();
+    } else {
+      alert(res.error?.message || 'Gagal menghapus sesi kelas');
+    }
+  };
+
+  const availableClassCodes = useMemo(() => {
+    const set = new Set();
+    for (const c of classes) {
+      if (c.class_code) set.add(String(c.class_code).trim().toUpperCase());
+    }
+    for (const s of sessions) {
+      if (s.class_name) set.add(String(s.class_name).trim().toUpperCase());
+    }
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, 'id-ID', { numeric: true, sensitivity: 'base' })
+    );
+  }, [classes, sessions]);
+
   const activeSessionByClassId = useMemo(() => {
     const map = new Map();
     for (const s of activeSessions) {
@@ -186,6 +252,10 @@ export default function AttendanceDashboardPage() {
           ? item.schedule_day === todayDay
           : item.schedule_day === selectedDayFilter;
 
+      const matchClass =
+        selectedClassFilter === 'ALL' ||
+        String(item.class_code || '').trim().toUpperCase() === selectedClassFilter;
+
       const q = scheduleSearch.trim().toLowerCase();
       const matchSearch =
         !q ||
@@ -195,9 +265,9 @@ export default function AttendanceDashboardPage() {
         (item.teacher_name || '').toLowerCase().includes(q) ||
         (item.room || '').toLowerCase().includes(q);
 
-      return matchDay && matchSearch;
+      return matchDay && matchClass && matchSearch;
     });
-  }, [classes, selectedDayFilter, todayDay, scheduleSearch]);
+  }, [classes, selectedDayFilter, selectedClassFilter, todayDay, scheduleSearch]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -295,14 +365,30 @@ export default function AttendanceDashboardPage() {
                   </div>
                 </div>
 
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="w-full"
-                  onClick={() => router.push(`/attendance/session/${s.id}`)}
-                >
-                  Kelola Roster & Kehadiran Kelas →
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="flex-1"
+                    onClick={() => router.push(`/attendance/session/${s.id}`)}
+                  >
+                    Kelola Roster & Kehadiran Kelas →
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => openEditSessionModal(s)}
+                  >
+                    Edit Sesi
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="md"
+                    onClick={() => handleDeleteSession(s)}
+                  >
+                    Hapus
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -365,13 +451,25 @@ export default function AttendanceDashboardPage() {
             ))}
           </div>
 
-          <div className="w-full sm:w-72">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <select
+              value={selectedClassFilter}
+              onChange={(e) => setSelectedClassFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1E4DBD]/20 focus:border-[#1E4DBD]"
+            >
+              <option value="ALL">Semua Kelas ({availableClassCodes.length})</option>
+              {availableClassCodes.map((cls) => (
+                <option key={cls} value={cls}>
+                  Kelas {cls}
+                </option>
+              ))}
+            </select>
             <input
               type="text"
               placeholder="Cari kelas, mapel, atau nama guru..."
               value={scheduleSearch}
               onChange={(e) => setScheduleSearch(e.target.value)}
-              className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E4DBD]/20 focus:border-[#1E4DBD]"
+              className="w-full sm:w-64 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E4DBD]/20 focus:border-[#1E4DBD]"
             />
           </div>
         </div>
@@ -524,13 +622,29 @@ export default function AttendanceDashboardPage() {
                       </p>
                     </div>
 
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => router.push(`/attendance/session/${cs.id}`)}
-                    >
-                      Lihat Roster
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => router.push(`/attendance/session/${cs.id}`)}
+                      >
+                        Lihat Roster
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openEditSessionModal(cs)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDeleteSession(cs)}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -666,6 +780,93 @@ export default function AttendanceDashboardPage() {
             Toleransi waktu hadir tepat waktu adalah 15 menit dari sesi dibuka. Siswa yang memindai kartu setelah 15 menit akan ditandai sebagai Terlambat.
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Edit Sesi Kelas */}
+      <Modal
+        isOpen={Boolean(editingSession)}
+        onClose={() => setEditingSession(null)}
+        title={`Edit Sesi Kelas ${editingSession?.class_name || ''}`}
+        footerActions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditingSession(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSavingEdit}
+              onClick={handleSaveEditSession}
+            >
+              Simpan Perubahan
+            </Button>
+          </>
+        }
+      >
+        {editingSession && (
+          <form onSubmit={handleSaveEditSession} className="space-y-3 text-xs">
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Topik / Materi Pembelajaran
+              </label>
+              <input
+                type="text"
+                value={editTopic}
+                onChange={(e) => setEditTopic(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-800 mb-1">
+                  Pertemuan Ke-
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="36"
+                  value={editSessionNumber}
+                  onChange={(e) => setEditSessionNumber(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-800 mb-1">
+                  Tanggal Sesi
+                </label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Status Sesi Kelas
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900"
+              >
+                <option value="OPEN">OPEN (Sesi Terbuka / Aktifkan Kembali)</option>
+                <option value="CLOSED">CLOSED (Sesi Ditutup)</option>
+              </select>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

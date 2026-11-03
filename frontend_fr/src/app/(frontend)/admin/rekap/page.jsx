@@ -1,8 +1,29 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Modal from '@/components/Modal';
+import Button from '@/components/Button';
 import { attendanceApi } from '@/lib/attendanceApi';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
+import { accountApiAdapter } from '@/lib/features/auth/infrastructure/accountApiAdapter';
+
+function normalizeClassLabel(val) {
+  return String(val || '')
+    .trim()
+    .replace(/^kelas\s+/i, '')
+    .toUpperCase();
+}
+
+function extractTingkat(classLabel) {
+  const norm = normalizeClassLabel(classLabel);
+  if (!norm) return '';
+  if (norm.startsWith('VII')) return '7';
+  if (norm.startsWith('VIII')) return '8';
+  if (norm.startsWith('IX')) return '9';
+  const match = norm.match(/^(\d+)/);
+  return match ? match[1] : norm.charAt(0);
+}
 
 export default function AttendanceRekapPage() {
   const today = new Date();
@@ -21,9 +42,19 @@ export default function AttendanceRekapPage() {
   const [endDate, setEndDate] = useState(todayStr);
   const [search, setSearch] = useState('');
   const [classes, setClasses] = useState([]);
+  const [studentClassNames, setStudentClassNames] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // State Edit Sesi Modal
+  const [editingSession, setEditingSession] = useState(null);
+  const [editTopic, setEditTopic] = useState('');
+  const [editSessionNumber, setEditSessionNumber] = useState(1);
+  const [editDate, setEditDate] = useState('');
+  const [editStatus, setEditStatus] = useState('OPEN');
+  const [isSavingSession, setIsSavingSession] = useState(false);
 
   const applyPeriodPreset = (preset) => {
     const now = new Date();
@@ -50,45 +81,175 @@ export default function AttendanceRekapPage() {
     }
   };
 
-  useEffect(() => {
-    classApiAdapter.getAll().then(setClasses).catch((err) => setError(err.message));
+  const loadMasterAndSessions = useCallback(async () => {
+    try {
+      const [clsList, studentsList, sessRes] = await Promise.all([
+        classApiAdapter.getAll({ includeAll: true }),
+        accountApiAdapter.getStudents(),
+        attendanceApi.getSessions(),
+      ]);
+      setClasses(Array.isArray(clsList) ? clsList : []);
+      if (Array.isArray(studentsList)) {
+        const sClasses = studentsList
+          .map((s) => normalizeClassLabel(s.class_name || s.className))
+          .filter((c) => c && c !== '-');
+        setStudentClassNames(Array.from(new Set(sClasses)));
+      }
+      if (sessRes?.success && Array.isArray(sessRes.data)) {
+        setSessions(sessRes.data);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
   }, []);
 
   useEffect(() => {
+    loadMasterAndSessions();
+  }, [loadMasterAndSessions]);
+
+  const fetchReport = useCallback(() => {
     let active = true;
     setIsLoading(true);
     setError('');
-    attendanceApi.getAttendanceReport({
-      start_date: startDate,
-      end_date: endDate,
-      tingkat: filterTingkat,
-      class_id: filterKelas,
-      search,
-    }).then((res) => {
-      if (!active) return;
-      if (res.success) {
-        setRows(Array.isArray(res.data) ? res.data : []);
-      } else {
-        setRows([]);
-        setError(res.error?.message || 'Rekap presensi gagal dimuat');
-      }
-    }).catch((err) => {
-      if (active) {
-        setRows([]);
-        setError(err.message || 'Rekap presensi gagal dimuat');
-      }
-    }).finally(() => {
-      if (active) setIsLoading(false);
-    });
+    attendanceApi
+      .getAttendanceReport({
+        start_date: startDate,
+        end_date: endDate,
+        tingkat: filterTingkat,
+        class_id: filterKelas,
+        search,
+      })
+      .then((res) => {
+        if (!active) return;
+        if (res.success) {
+          setRows(Array.isArray(res.data) ? res.data : []);
+        } else {
+          setRows([]);
+          setError(res.error?.message || 'Rekap presensi gagal dimuat');
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setRows([]);
+          setError(err.message || 'Rekap presensi gagal dimuat');
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
       active = false;
     };
   }, [startDate, endDate, filterTingkat, filterKelas, search]);
 
-  const availableClasses = useMemo(() => classes
-    .filter((item) => filterTingkat === 'ALL' || String(item.class_code || '').startsWith(filterTingkat))
-    .map((item) => item.class_code)
-    .filter(Boolean), [classes, filterTingkat]);
+  useEffect(() => {
+    const cleanup = fetchReport();
+    return cleanup;
+  }, [fetchReport]);
+
+  // Kumpulan seluruh kelas unik yang diinputkan (dari Data Siswa, Jadwal Kelas, Sesi, dan Rekap)
+  const allInputClassCodes = useMemo(() => {
+    const set = new Set();
+    for (const c of classes) {
+      const label = normalizeClassLabel(c.class_code);
+      if (label) set.add(label);
+    }
+    for (const sc of studentClassNames) {
+      const label = normalizeClassLabel(sc);
+      if (label) set.add(label);
+    }
+    for (const s of sessions) {
+      const label = normalizeClassLabel(s.class_name);
+      if (label) set.add(label);
+    }
+    for (const r of rows) {
+      const label = normalizeClassLabel(r.class_name);
+      if (label) set.add(label);
+    }
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, 'id-ID', { numeric: true, sensitivity: 'base' })
+    );
+  }, [classes, studentClassNames, sessions, rows]);
+
+  const availableTingkat = useMemo(() => {
+    const set = new Set();
+    for (const cls of allInputClassCodes) {
+      const t = extractTingkat(cls);
+      if (t) set.add(t);
+    }
+    const arr = Array.from(set).sort((a, b) =>
+      a.localeCompare(b, 'id-ID', { numeric: true })
+    );
+    return arr.length > 0 ? arr : ['7', '8', '9'];
+  }, [allInputClassCodes]);
+
+  const availableClasses = useMemo(() => {
+    return allInputClassCodes.filter(
+      (cls) => filterTingkat === 'ALL' || extractTingkat(cls) === filterTingkat
+    );
+  }, [allInputClassCodes, filterTingkat]);
+
+  const filteredPeriodSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      const sDate = String(s.date || '').slice(0, 10);
+      if (startDate && sDate < startDate) return false;
+      if (endDate && sDate > endDate) return false;
+      const clsLabel = normalizeClassLabel(s.class_name);
+      if (filterTingkat !== 'ALL' && extractTingkat(clsLabel) !== filterTingkat) {
+        return false;
+      }
+      if (filterKelas !== 'ALL' && clsLabel !== normalizeClassLabel(filterKelas)) {
+        return false;
+      }
+      return true;
+    });
+  }, [sessions, startDate, endDate, filterTingkat, filterKelas]);
+
+  const openEditSessionModal = (sess) => {
+    setEditingSession(sess);
+    setEditTopic(sess.topic || '');
+    setEditSessionNumber(sess.session_number || 1);
+    setEditDate(String(sess.date || '').slice(0, 10) || todayStr);
+    setEditStatus(sess.status || 'OPEN');
+  };
+
+  const handleSaveEditSession = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingSession) return;
+    setIsSavingSession(true);
+    const res = await attendanceApi.editSession(editingSession.id, {
+      class_id: editingSession.class_id,
+      topic: editTopic,
+      session_number: Number(editSessionNumber) || 1,
+      date: editDate,
+      status: editStatus,
+    });
+    setIsSavingSession(false);
+    if (res.success) {
+      setEditingSession(null);
+      await loadMasterAndSessions();
+      fetchReport();
+    } else {
+      alert(res.error?.message || 'Gagal memperbarui sesi kelas');
+    }
+  };
+
+  const handleDeleteSession = async (sess) => {
+    if (
+      !window.confirm(
+        `Hapus sesi Kelas ${sess.class_name} (${sess.topic} - ${sess.date}) beserta seluruh data presensi siswa di sesi ini?`
+      )
+    ) {
+      return;
+    }
+    const res = await attendanceApi.deleteSession(sess.id);
+    if (res.success) {
+      await loadMasterAndSessions();
+      fetchReport();
+    } else {
+      alert(res.error?.message || 'Gagal menghapus sesi kelas');
+    }
+  };
 
   const filteredRows = useMemo(() => {
     return rows.filter((item) => {
@@ -251,16 +412,20 @@ export default function AttendanceRekapPage() {
             }}
             className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
           >
-            <option value="ALL">Semua Tingkat (7, 8, 9)</option>
-            <option value="7">Tingkat 7</option>
-            <option value="8">Tingkat 8</option>
-            <option value="9">Tingkat 9</option>
+            <option value="ALL">
+              Semua Tingkat ({availableTingkat.join(', ')})
+            </option>
+            {availableTingkat.map((t) => (
+              <option key={t} value={t}>
+                Tingkat {t}
+              </option>
+            ))}
           </select>
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Filter Kelas Spesifik
+            Filter Kelas Spesifik ({availableClasses.length} Kelas)
           </label>
           <select
             value={filterKelas}
@@ -319,6 +484,77 @@ export default function AttendanceRekapPage() {
           />
         </div>
       </div>
+
+      {/* Daftar Sesi Kelas pada Periode & Filter Ini (Bisa Edit / Hapus Sesi Demo) */}
+      {filteredPeriodSessions.length > 0 && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div>
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900">
+                Daftar Sesi Kelas pada Filter Ini ({filteredPeriodSessions.length} Sesi)
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Anda dapat mengedit sesi, mengubah kehadiran siswa, atau menghapus sesi percobaan/demo agar tidak masuk ke rekapitulasi.
+              </p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-100 max-h-[240px] overflow-y-auto">
+            {filteredPeriodSessions.map((sess) => (
+              <div
+                key={sess.id}
+                className="py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs hover:bg-slate-50/70 px-2 rounded-lg"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                      Kelas {sess.class_name}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded font-semibold text-[10px] border ${
+                        sess.status === 'OPEN'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {sess.status === 'OPEN' ? 'Sesi Terbuka' : 'Sesi Ditutup'}
+                    </span>
+                    <span className="font-bold text-slate-900">
+                      {sess.topic} (Sesi #{sess.session_number})
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 tabular-nums">
+                    Tanggal: {String(sess.date || '').slice(0, 10)} • Guru: {sess.teacher_name || '-'} • Hadir: {sess.total_present ?? 0} / {sess.total_students ?? 0} Siswa
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link
+                    href={`/attendance/session/${sess.id}`}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold"
+                  >
+                    Kelola Absensi
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => openEditSessionModal(sess)}
+                    className="px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold cursor-pointer"
+                  >
+                    Edit Sesi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSession(sess)}
+                    className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold cursor-pointer"
+                  >
+                    Hapus Sesi
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabel Data Rekapitulasi */}
       <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
@@ -391,6 +627,93 @@ export default function AttendanceRekapPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Edit Sesi Kelas */}
+      <Modal
+        isOpen={Boolean(editingSession)}
+        onClose={() => setEditingSession(null)}
+        title={`Edit Sesi Kelas ${editingSession?.class_name || ''}`}
+        footerActions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditingSession(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSavingSession}
+              onClick={handleSaveEditSession}
+            >
+              Simpan Perubahan
+            </Button>
+          </>
+        }
+      >
+        {editingSession && (
+          <form onSubmit={handleSaveEditSession} className="space-y-3 text-xs">
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Topik / Materi Pembelajaran
+              </label>
+              <input
+                type="text"
+                value={editTopic}
+                onChange={(e) => setEditTopic(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-800 mb-1">
+                  Pertemuan Ke-
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="36"
+                  value={editSessionNumber}
+                  onChange={(e) => setEditSessionNumber(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-800 mb-1">
+                  Tanggal Sesi
+                </label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Status Sesi Kelas
+              </label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900"
+              >
+                <option value="OPEN">OPEN (Sesi Terbuka / Aktifkan Kembali)</option>
+                <option value="CLOSED">CLOSED (Sesi Ditutup)</option>
+              </select>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

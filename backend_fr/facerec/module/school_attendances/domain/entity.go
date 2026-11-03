@@ -102,6 +102,14 @@ type OpenSessionRequest struct {
 	SessionNumber int    `json:"session_number"`
 }
 
+type UpdateSessionRequest struct {
+	ClassID       string `json:"class_id"`
+	Topic         string `json:"topic"`
+	SessionNumber int    `json:"session_number"`
+	Date          string `json:"date"`
+	Status        string `json:"status"`
+}
+
 type ScanQRRequest struct {
 	SessionID   string `json:"session_id"`
 	QRCodeToken string `json:"qr_code_token"`

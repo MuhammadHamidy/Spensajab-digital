@@ -113,6 +113,58 @@ func (u *useCase) CloseSession(ctx context.Context, teacherID string, sessionID 
 	return u.repo.CloseSessionAndMarkAlpha(ctx, sessionID)
 }
 
+func (u *useCase) EditSession(ctx context.Context, sessionID string, req domain.UpdateSessionRequest) (*domain.ClassSession, error) {
+	if sessionID == "" {
+		return nil, errors.New("session_id wajib diisi")
+	}
+	sess, err := u.repo.FindSessionByID(ctx, sessionID)
+	if err != nil || sess == nil {
+		return nil, fmt.Errorf("sesi tidak ditemukan: %w", err)
+	}
+
+	if req.ClassID != "" {
+		sess.ClassID = req.ClassID
+	}
+	if req.Topic != "" {
+		sess.Topic = req.Topic
+	}
+	if req.SessionNumber > 0 {
+		sess.SessionNumber = req.SessionNumber
+	}
+	if req.Date != "" {
+		sess.Date = req.Date
+	}
+
+	now := time.Now()
+	if req.Status != "" && req.Status != sess.Status {
+		if req.Status == domain.SessionStatusOpen {
+			sess.Status = domain.SessionStatusOpen
+			sess.ClosedAt = nil
+			cutoff := now.Add(15 * time.Minute)
+			sess.LateCutoffAt = &cutoff
+		} else if req.Status == domain.SessionStatusClosed {
+			if _, err := u.repo.CloseSessionAndMarkAlpha(ctx, sessionID); err != nil {
+				return nil, err
+			}
+			sess.Status = domain.SessionStatusClosed
+		}
+	}
+
+	sess.UpdatedAt = now
+	if err := u.repo.UpdateSession(ctx, sess); err != nil {
+		return nil, fmt.Errorf("gagal memperbarui sesi: %w", err)
+	}
+
+	return u.repo.FindSessionByID(ctx, sessionID)
+}
+
+func (u *useCase) DeleteSession(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return errors.New("session_id wajib diisi")
+	}
+	return u.repo.DeleteSession(ctx, sessionID)
+}
+
 func (u *useCase) GetSessionDetail(ctx context.Context, sessionID string) (*domain.SessionDetailResponse, error) {
 	sess, err := u.repo.FindSessionByID(ctx, sessionID)
 	if err != nil {
@@ -270,7 +322,7 @@ func (u *useCase) ManualOverride(ctx context.Context, teacherID string, sessionI
 	if err != nil {
 		return fmt.Errorf("sesi tidak ditemukan: %w", err)
 	}
-	if sess.Status == domain.SessionStatusClosed && teacherID != "user-admin-1" {
+	if sess.Status == domain.SessionStatusClosed && teacherID == "teacher-owner" {
 		return errors.New("sesi kelas sudah ditutup")
 	}
 

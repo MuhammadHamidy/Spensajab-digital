@@ -484,6 +484,36 @@ export default function GuruMobilePortal({ user, onLogout }) {
     }
   };
 
+  // Delete session (demo / salah buka)
+  const handleDeleteSelectedSession = async () => {
+    const targetSessId = selectedSessionId || activeSession?.id;
+    if (!targetSessId) return;
+    const targetSess = sessions.find((s) => String(s.id) === String(targetSessId)) || activeSession;
+    const label = targetSess
+      ? `Kelas ${targetSess.class_name} (${targetSess.topic || 'Sesi'})`
+      : `Sesi #${targetSessId}`;
+    if (
+      !window.confirm(
+        `Apakah Anda yakin ingin menghapus ${label}?\nSeluruh data kehadiran siswa pada sesi ini akan ikut terhapus.`
+      )
+    ) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    const res = await attendanceApi.deleteSession(targetSessId);
+    setIsSubmitting(false);
+
+    if (res.success !== false) {
+      if (String(selectedSessionId) === String(targetSessId)) {
+        setSelectedSessionId(null);
+      }
+      await fetchSessionsList();
+    } else {
+      alert(res.error?.message || res.message || 'Gagal menghapus sesi kelas');
+    }
+  };
+
   // Filter roster list
   const filteredRoster = attendances.filter((st) => {
     const matchStatus = filterRosterStatus === 'ALL' || st.status === filterRosterStatus;
@@ -1041,9 +1071,21 @@ export default function GuruMobilePortal({ user, onLogout }) {
 
             {/* Pemilih Kelas & Sesi */}
             <div className="bg-white border border-[#E2E8F0] p-3 rounded-[10px] space-y-2">
-              <label className="block text-xs font-semibold text-[#0F172A]">
-                Pilih Sesi Kelas yang Ingin Dikelola:
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-[#0F172A]">
+                  Pilih Sesi Kelas yang Ingin Dikelola:
+                </label>
+                {selectedSessionId && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedSession}
+                    disabled={isSubmitting}
+                    className="px-2.5 py-1 rounded-[6px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold cursor-pointer"
+                  >
+                    Hapus Sesi Ini
+                  </button>
+                )}
+              </div>
               <select
                 value={selectedSessionId || ''}
                 onChange={(e) => setSelectedSessionId(e.target.value)}

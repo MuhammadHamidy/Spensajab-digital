@@ -49,6 +49,11 @@ export default function ClassSessionScannerPage() {
   const [scannedStudentData, setScannedStudentData] = useState(null);
   const scanSuccessTimerRef = useRef(null);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [isEditSessionModalOpen, setIsEditSessionModalOpen] = useState(false);
+  const [editTopic, setEditTopic] = useState('');
+  const [editSessionNumber, setEditSessionNumber] = useState(1);
+  const [editDate, setEditDate] = useState('');
+  const [editStatus, setEditStatus] = useState('OPEN');
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [selectedStudentForOverride, setSelectedStudentForOverride] = useState(null);
   const [overrideStatus, setOverrideStatus] = useState('SAKIT');
@@ -210,6 +215,52 @@ export default function ClassSessionScannerPage() {
     }
   };
 
+  const handleOpenEditSessionModal = () => {
+    if (!session) return;
+    setEditTopic(session.topic || '');
+    setEditSessionNumber(session.session_number || 1);
+    setEditDate(String(session.date || '').slice(0, 10));
+    setEditStatus(session.status || 'OPEN');
+    setIsEditSessionModalOpen(true);
+  };
+
+  const handleSaveEditSession = async (e) => {
+    if (e) e.preventDefault();
+    setIsSubmitting(true);
+    const res = await attendanceApi.editSession(sessionId, {
+      class_id: session?.class_id,
+      topic: editTopic,
+      session_number: Number(editSessionNumber) || 1,
+      date: editDate,
+      status: editStatus,
+    });
+    setIsSubmitting(false);
+    if (res.success) {
+      setIsEditSessionModalOpen(false);
+      fetchSessionData();
+    } else {
+      alert(res.error?.message || 'Gagal memperbarui sesi kelas');
+    }
+  };
+
+  const handleDeleteCurrentSession = async () => {
+    if (
+      !window.confirm(
+        `Hapus sesi Kelas ${session?.class_name || ''} (${session?.topic || ''}) beserta seluruh data presensi di dalamnya?`
+      )
+    ) {
+      return;
+    }
+    setIsSubmitting(true);
+    const res = await attendanceApi.deleteSession(sessionId);
+    setIsSubmitting(false);
+    if (res.success) {
+      router.push('/attendance');
+    } else {
+      alert(res.error?.message || 'Gagal menghapus sesi kelas');
+    }
+  };
+
   // 6. Manual Attendance Override
   const handleConfirmOverride = async () => {
     if (!selectedStudentForOverride) return;
@@ -356,6 +407,22 @@ export default function ClassSessionScannerPage() {
                 Tutup Kelas
               </Button>
             )}
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleOpenEditSessionModal}
+            >
+              Edit Sesi
+            </Button>
+
+            <button
+              type="button"
+              onClick={handleDeleteCurrentSession}
+              className="px-2.5 py-1.5 rounded-[6px] border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 cursor-pointer"
+            >
+              Hapus Sesi
+            </button>
           </div>
         </div>
       </header>
@@ -542,46 +609,44 @@ export default function ClassSessionScannerPage() {
                       )}
 
                       {/* Tombol Manual Attendance Override (Sakit / Izin / Ubah) */}
-                      {isSessionOpen && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleQuickStatusOverride(item, 'SAKIT')}
-                            className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
-                              item.status === 'SAKIT'
-                                ? 'bg-[#0284C7] border-[#0284C7] text-white'
-                                : 'bg-[#F0F9FF] border-[#BAE6FD] text-[#0369A1] hover:bg-[#E0F2FE]'
-                            }`}
-                          >
-                            Sakit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleQuickStatusOverride(item, 'IZIN')}
-                            className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
-                              item.status === 'IZIN'
-                                ? 'bg-[#4F46E5] border-[#4F46E5] text-white'
-                                : 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4338CA] hover:bg-[#E0E7FF]'
-                            }`}
-                          >
-                            Izin
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedStudentForOverride(item);
-                              setOverrideStatus(
-                                item.status === 'PENDING' ? 'SAKIT' : item.status
-                              );
-                              setOverrideNotes(item.notes || '');
-                              setIsOverrideModalOpen(true);
-                            }}
-                            className="px-2 py-1 rounded-[6px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-xs font-semibold text-[#0F172A] cursor-pointer"
-                          >
-                            Ubah
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusOverride(item, 'SAKIT')}
+                          className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
+                            item.status === 'SAKIT'
+                              ? 'bg-[#0284C7] border-[#0284C7] text-white'
+                              : 'bg-[#F0F9FF] border-[#BAE6FD] text-[#0369A1] hover:bg-[#E0F2FE]'
+                          }`}
+                        >
+                          Sakit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickStatusOverride(item, 'IZIN')}
+                          className={`px-2 py-1 rounded-[6px] border text-xs font-semibold cursor-pointer transition-colors ${
+                            item.status === 'IZIN'
+                              ? 'bg-[#4F46E5] border-[#4F46E5] text-white'
+                              : 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4338CA] hover:bg-[#E0E7FF]'
+                          }`}
+                        >
+                          Izin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStudentForOverride(item);
+                            setOverrideStatus(
+                              item.status === 'PENDING' ? 'SAKIT' : item.status
+                            );
+                            setOverrideNotes(item.notes || '');
+                            setIsOverrideModalOpen(true);
+                          }}
+                          className="px-2 py-1 rounded-[6px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-xs font-semibold text-[#0F172A] cursor-pointer"
+                        >
+                          Ubah
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -594,6 +659,91 @@ export default function ClassSessionScannerPage() {
           </div>
         </section>
       </main>
+
+      {/* ===================== MODAL EDIT SESI KELAS ===================== */}
+      <Modal
+        isOpen={isEditSessionModalOpen}
+        onClose={() => setIsEditSessionModalOpen(false)}
+        title={`Edit Sesi Kelas ${session?.class_name || ''}`}
+        footerActions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsEditSessionModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSubmitting}
+              onClick={handleSaveEditSession}
+            >
+              Simpan Perubahan
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveEditSession} className="space-y-3 text-xs">
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              Topik / Materi Pembelajaran
+            </label>
+            <input
+              type="text"
+              value={editTopic}
+              onChange={(e) => setEditTopic(e.target.value)}
+              className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A]"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+                Pertemuan Ke-
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="36"
+                value={editSessionNumber}
+                onChange={(e) => setEditSessionNumber(e.target.value)}
+                className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] tabular-nums"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+                Tanggal Sesi
+              </label>
+              <input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] tabular-nums"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              Status Sesi Kelas
+            </label>
+            <select
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value)}
+              className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A]"
+            >
+              <option value="OPEN">OPEN (Sesi Terbuka / Aktifkan Kembali)</option>
+              <option value="CLOSED">CLOSED (Sesi Ditutup)</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
 
       {/* ===================== MODAL TUTUP SESI KELAS ===================== */}
       <Modal

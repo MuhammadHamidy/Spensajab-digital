@@ -102,6 +102,11 @@ func (m *MockRepository) UpdateSession(ctx context.Context, session *domain.Clas
 	return args.Error(0)
 }
 
+func (m *MockRepository) DeleteSession(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
+	return args.Error(0)
+}
+
 func (m *MockRepository) CloseSessionAndMarkAlpha(ctx context.Context, sessionID string) (*domain.SessionSummary, error) {
 	args := m.Called(ctx, sessionID)
 	return args.Get(0).(*domain.SessionSummary), args.Error(1)

@@ -24,6 +24,8 @@ func (h *SchoolAttendanceHandler) RegisterRoutes(app *fiber.App) {
 	// Sesi Kelas
 	api.Post("/sessions/open", h.OpenSession)
 	api.Post("/sessions/:id/close", h.CloseSession)
+	api.Put("/sessions/:id", h.EditSession)
+	api.Delete("/sessions/:id", h.DeleteSession)
 	api.Get("/sessions/:id", h.GetSessionDetail)
 	api.Get("/sessions", h.GetSessions)
 
@@ -73,6 +75,30 @@ func (h *SchoolAttendanceHandler) CloseSession(c *fiber.Ctx) error {
 	}
 
 	return c.Status(http.StatusOK).JSON(responses.Success(summary, "Sesi kelas resmi ditutup. Siswa tanpa keterangan telah ditandai ALPHA."))
+}
+
+func (h *SchoolAttendanceHandler) EditSession(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
+	var req domain.UpdateSessionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responses.Fail("BAD_REQUEST", err.Error()))
+	}
+
+	sess, err := h.useCase.EditSession(c.Context(), sessionID, req)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responses.Fail("EDIT_SESSION_ERROR", err.Error()))
+	}
+
+	return c.Status(http.StatusOK).JSON(responses.Success(sess, "Sesi kelas berhasil diperbarui"))
+}
+
+func (h *SchoolAttendanceHandler) DeleteSession(c *fiber.Ctx) error {
+	sessionID := c.Params("id")
+	if err := h.useCase.DeleteSession(c.Context(), sessionID); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responses.Fail("DELETE_SESSION_ERROR", err.Error()))
+	}
+
+	return c.Status(http.StatusOK).JSON(responses.Success(true, "Sesi kelas beserta data presensi di dalamnya berhasil dihapus"))
 }
 
 func (h *SchoolAttendanceHandler) GetSessionDetail(c *fiber.Ctx) error {

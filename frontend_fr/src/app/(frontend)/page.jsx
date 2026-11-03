@@ -136,6 +136,31 @@ export default function MainPage() {
     return (item.total_meetings || 0) > 0;
   });
 
+  const handleDeleteSessionFromDashboard = async (item) => {
+    if (!item?.id) return;
+    const confirmed = window.confirm(
+      `Apakah Anda yakin ingin menghapus sesi Kelas ${item.class_name} (${item.topic || 'Sesi'}) pada tanggal ${item.date || '-'}?\nSeluruh data kehadiran siswa pada sesi ini akan ikut dihapus dari rekap.`
+    );
+    if (!confirmed) return;
+
+    const res = await attendanceApi.deleteSession(item.id);
+    if (res.success !== false) {
+      const [liveRes, sessionsRes, reportRes] = await Promise.all([
+        attendanceApi.getLiveMonitoring(),
+        attendanceApi.getSessions(),
+        attendanceApi.getAttendanceReport({
+          start_date: dailyReportDate,
+          end_date: dailyReportDate,
+        }),
+      ]);
+      setLiveSessions(liveRes.success && liveRes.data ? liveRes.data : []);
+      setRecentSessions(sessionsRes.success && sessionsRes.data ? sessionsRes.data.slice(0, 5) : []);
+      setDailyReportRows(reportRes.success && Array.isArray(reportRes.data) ? reportRes.data : []);
+    } else {
+      alert(res.error?.message || res.message || 'Gagal menghapus sesi kelas');
+    }
+  };
+
   // 1. Loading state
   if (authLoading || !isAuthenticated || !user) {
     return (
@@ -775,8 +800,8 @@ export default function MainPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex items-center gap-2.5">
+                <div className="text-right mr-1.5">
                   <span className="text-xs font-bold text-[#15803D] tabular-nums block">
                     {item.total_present ?? 0} Siswa Hadir
                   </span>
@@ -790,6 +815,13 @@ export default function MainPage() {
                 >
                   Detail Sesi
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSessionFromDashboard(item)}
+                  className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Hapus
+                </button>
               </div>
             </div>
           ))}

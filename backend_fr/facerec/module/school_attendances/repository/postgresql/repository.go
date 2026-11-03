@@ -139,6 +139,15 @@ func (r *repository) UpdateSession(ctx context.Context, session *domain.ClassSes
 	return r.db.WithContext(ctx).Table("class_sessions").Save(session).Error
 }
 
+func (r *repository) DeleteSession(ctx context.Context, sessionID string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("attendances").Where("session_id = ?", sessionID).Delete(&domain.Attendance{}).Error; err != nil {
+			return err
+		}
+		return tx.Table("class_sessions").Where("id = ?", sessionID).Delete(&domain.ClassSession{}).Error
+	})
+}
+
 func (r *repository) CloseSessionAndMarkAlpha(ctx context.Context, sessionID string) (*domain.SessionSummary, error) {
 	var summary domain.SessionSummary
 	now := time.Now()
@@ -421,10 +430,17 @@ func (r *repository) GetAttendanceReport(ctx context.Context, filter domain.Atte
 		Order("classes.class_code ASC, accounts.full_name ASC")
 
 	if filter.Tingkat != "" && filter.Tingkat != "ALL" {
-		query = query.Where("LEFT(classes.class_code, 1) = ?", filter.Tingkat)
+		query = query.Where(
+			"UPPER(LEFT(TRIM(REPLACE(REPLACE(UPPER(COALESCE(NULLIF(accounts.class_name, ''), classes.class_code)), 'KELAS', ''), '-', '')), 1)) = UPPER(?)",
+			filter.Tingkat,
+		)
 	}
 	if filter.ClassID != "" && filter.ClassID != "ALL" {
-		query = query.Where("classes.class_code = ? OR classes.id = ?", filter.ClassID, filter.ClassID)
+		normFilterClass := normalizeClassKey(filter.ClassID)
+		query = query.Where(
+			"classes.id = ? OR UPPER(REPLACE(REPLACE(REPLACE(classes.class_code, 'KELAS', ''), '-', ''), ' ', '')) = ? OR UPPER(REPLACE(REPLACE(REPLACE(COALESCE(accounts.class_name, ''), 'KELAS', ''), '-', ''), ' ', '')) = ?",
+			filter.ClassID, normFilterClass, normFilterClass,
+		)
 	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"

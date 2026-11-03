@@ -47,6 +47,19 @@ export const attendanceApi = {
     });
   },
 
+  editSession: async (sessionId, payload = {}) => {
+    return fetchJson(`/school/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteSession: async (sessionId) => {
+    return fetchJson(`/school/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  },
+
   getSessionDetail: async (sessionId) => {
     return fetchJson(`/school/sessions/${sessionId}`);
   },

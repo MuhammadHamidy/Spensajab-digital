@@ -8,6 +8,8 @@ import (
 type UseCase interface {
 	OpenSession(ctx context.Context, teacherID string, req OpenSessionRequest) (*ClassSession, error)
 	CloseSession(ctx context.Context, teacherID string, sessionID string) (*SessionSummary, error)
+	EditSession(ctx context.Context, sessionID string, req UpdateSessionRequest) (*ClassSession, error)
+	DeleteSession(ctx context.Context, sessionID string) error
 	GetSessionDetail(ctx context.Context, sessionID string) (*SessionDetailResponse, error)
 	GetTeacherSessions(ctx context.Context, teacherID string, classID string, status string) ([]*ClassSession, error)
 	ScanQRCode(ctx context.Context, sessionID string, qrToken string) (*ScanResultResponse, error)

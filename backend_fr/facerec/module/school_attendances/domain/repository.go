@@ -12,6 +12,7 @@ type Repository interface {
 	FindSessions(ctx context.Context, teacherID string, classID string, status string) ([]*ClassSession, error)
 	CreateSession(ctx context.Context, session *ClassSession) error
 	UpdateSession(ctx context.Context, session *ClassSession) error
+	DeleteSession(ctx context.Context, sessionID string) error
 	CloseSessionAndMarkAlpha(ctx context.Context, sessionID string) (*SessionSummary, error)
 
 	// Students & Enrollments
