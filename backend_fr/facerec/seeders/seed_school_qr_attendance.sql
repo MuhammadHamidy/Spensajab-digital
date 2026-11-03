@@ -1,4 +1,4 @@
--- Seed hanya definisi role aplikasi.
+-- Seed hanya definisi role aplikasi dan akun admin awal (idempotent, tanpa menghapus data).
 -- Akun, mata pelajaran, kelas, dan enrollment dibuat melalui panel admin.
 INSERT INTO roles (id, name, description) VALUES
 ('role-admin', 'ADMIN', 'Administrator sekolah'),
@@ -8,18 +8,7 @@ ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     description = EXCLUDED.description;
 
-DELETE FROM attendances;
-DELETE FROM class_sessions;
-DELETE FROM class_enrollments;
-DELETE FROM teacher_classes;
-DELETE FROM teacher_courses;
-DELETE FROM student_faces;
-DELETE FROM classes;
-DELETE FROM accounts;
-DELETE FROM courses;
-DELETE FROM roles WHERE name NOT IN ('ADMIN', 'GURU', 'SISWA');
-
--- Akun awal untuk masuk ke panel admin.
+-- Akun awal untuk masuk ke panel admin (hanya dibuat jika belum ada).
 -- Password awal: password (segera ganti setelah login)
 INSERT INTO accounts (
     id, username, password_hash, email, full_name, role_id, nim_nip, phone
@@ -33,9 +22,4 @@ INSERT INTO accounts (
     'ADMIN-001',
     ''
 )
-ON CONFLICT (id) DO UPDATE SET
-    username = EXCLUDED.username,
-    email = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    role_id = EXCLUDED.role_id,
-    password_hash = EXCLUDED.password_hash;
+ON CONFLICT (id) DO NOTHING;
