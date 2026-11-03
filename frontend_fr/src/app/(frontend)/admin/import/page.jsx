@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { attendanceApi } from '@/lib/attendanceApi';
+import { API_BASE_URL } from '@/lib/common/config';
 
 export default function BulkImportExcelPage() {
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'teachers'
@@ -53,7 +54,7 @@ export default function BulkImportExcelPage() {
   };
 
   const handleDownloadTemplate = (type) => {
-    window.open(`http://localhost:8080/api/school/import/template/${type}`, '_blank');
+    window.open(`${API_BASE_URL}/school/import/template/${type}`, '_blank');
   };
 
   return (

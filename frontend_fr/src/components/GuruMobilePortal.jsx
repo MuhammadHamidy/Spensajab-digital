@@ -8,7 +8,6 @@ import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { attendanceApi } from '@/lib/attendanceApi';
 import { attendanceAudio } from '@/lib/attendanceAudio';
-import { findStudentByTokenOrNisn } from '@/lib/studentDirectory';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
 function classScheduleTime(item) {
@@ -222,58 +221,10 @@ export default function GuruMobilePortal({ user, onLogout }) {
           setTimeout(() => setFeedbackState('idle'), 600);
           fetchSelectedSessionDetail(currentSessId);
         } else {
-          // Fallback cerdas jika backend offline: Cocokkan token dengan direktori data siswa
-          const matchedStudent = findStudentByTokenOrNisn(trimmedToken);
-
-          if (matchedStudent) {
-            attendanceAudio.playSuccessBeep();
-            setFeedbackState('success');
-            const resultData = {
-              full_name: matchedStudent.name,
-              nisn: matchedStudent.nisn,
-              class_name: matchedStudent.className || activeSession?.class_name || '7A',
-              status: isCutoffPassed ? 'TERLAMBAT' : 'HADIR',
-              scan_time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            };
-            setLastScanResult(resultData);
-            setScannedStudentData(resultData);
-            setIsScanSuccessModalOpen(true);
-            setStatusMessage(`Presensi berhasil: ${resultData.full_name} (${resultData.status})`);
-
-            // Perbarui daftar kehadiran lokal
-            setAttendances((prev) => {
-              const exists = prev.find((a) => a.nisn === matchedStudent.nisn);
-              if (exists) {
-                return prev.map((a) =>
-                  a.nisn === matchedStudent.nisn ? { ...a, status: resultData.status, timestamp: new Date().toISOString() } : a
-                );
-              }
-              return [
-                {
-                  id: `att-mock-${Date.now()}`,
-                  student_id: matchedStudent.id,
-                  student_name: matchedStudent.name,
-                  nisn: matchedStudent.nisn,
-                  status: resultData.status,
-                  timestamp: new Date().toISOString(),
-                },
-                ...prev,
-              ];
-            });
-
-            if (scanSuccessTimerRef.current) clearTimeout(scanSuccessTimerRef.current);
-            scanSuccessTimerRef.current = setTimeout(() => {
-              setIsScanSuccessModalOpen(false);
-            }, 3000);
-
-            setTimeout(() => setFeedbackState('idle'), 600);
-          } else {
-            // Jika token QR tidak cocok dengan siswa mana pun
-            attendanceAudio.playErrorBuzzer();
-            setFeedbackState('error');
-            setStatusMessage(`Kartu QR tidak terdaftar di sistem: ${trimmedToken}`);
-            setTimeout(() => setFeedbackState('idle'), 1500);
-          }
+          attendanceAudio.playErrorBuzzer();
+          setFeedbackState('error');
+          setStatusMessage(res.error?.message || 'Presensi gagal diproses oleh server');
+          setTimeout(() => setFeedbackState('idle'), 1500);
         }
       } catch (err) {
         attendanceAudio.playErrorBuzzer();
@@ -282,7 +233,7 @@ export default function GuruMobilePortal({ user, onLogout }) {
         setTimeout(() => setFeedbackState('idle'), 600);
       }
     },
-    [activeSession, selectedSessionId, isCutoffPassed, fetchSelectedSessionDetail]
+    [activeSession, selectedSessionId, fetchSelectedSessionDetail]
   );
 
   // 5. Global Keyboard Listener untuk Scanner USB

@@ -13,6 +13,7 @@ type UseCase interface {
 	ScanQRCode(ctx context.Context, sessionID string, qrToken string) (*ScanResultResponse, error)
 	ManualOverride(ctx context.Context, teacherID string, sessionID string, studentID string, req ManualOverrideRequest) error
 	GetLiveMonitoring(ctx context.Context) ([]*ClassSession, error)
+	GetAttendanceReport(ctx context.Context, filter AttendanceReportFilter) ([]*AttendanceReportRow, error)
 	GenerateQRCodePNG(ctx context.Context, qrToken string, size int) ([]byte, error)
 
 	// Courses (Mata Pelajaran)

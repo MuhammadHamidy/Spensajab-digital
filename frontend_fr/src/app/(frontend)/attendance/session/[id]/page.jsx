@@ -8,7 +8,6 @@ import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { attendanceApi } from '@/lib/attendanceApi';
 import { attendanceAudio } from '@/lib/attendanceAudio';
-import { findStudentByTokenOrNisn } from '@/lib/studentDirectory';
 
 export default function ClassSessionScannerPage() {
   const params = useParams();
@@ -143,58 +142,13 @@ export default function ClassSessionScannerPage() {
 
           fetchSessionData();
         } else {
-          // Fallback cerdas jika backend offline
-          const matchedStudent = findStudentByTokenOrNisn(trimmedToken);
+          attendanceAudio.playErrorBuzzer();
+          setFeedbackState('error');
+          setStatusMessage(res.error?.message || 'Presensi gagal diproses oleh server');
 
-          if (matchedStudent) {
-            attendanceAudio.playSuccessBeep();
-            setFeedbackState('success');
-            const resultData = {
-              full_name: matchedStudent.name,
-              nisn: matchedStudent.nisn,
-              class_name: matchedStudent.className || session?.class_name || '7A',
-              status: isCutoffPassed ? 'TERLAMBAT' : 'HADIR',
-              scan_time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            };
-            setLastScanResult(resultData);
-            setScannedStudentData(resultData);
-            setIsScanSuccessModalOpen(true);
-            setStatusMessage(`Presensi berhasil: ${resultData.full_name}`);
-
-            setAttendances((prev) => {
-              const exists = prev.find((a) => a.nisn === matchedStudent.nisn);
-              if (exists) {
-                return prev.map((a) =>
-                  a.nisn === matchedStudent.nisn ? { ...a, status: resultData.status } : a
-                );
-              }
-              return [
-                {
-                  id: `att-mock-${Date.now()}`,
-                  student_name: matchedStudent.name,
-                  nisn: matchedStudent.nisn,
-                  status: resultData.status,
-                  scan_time: resultData.scan_time,
-                },
-                ...prev,
-              ];
-            });
-
-            if (scanSuccessTimerRef.current) clearTimeout(scanSuccessTimerRef.current);
-            scanSuccessTimerRef.current = setTimeout(() => {
-              setIsScanSuccessModalOpen(false);
-            }, 3000);
-
-            setTimeout(() => setFeedbackState('idle'), 600);
-          } else {
-            attendanceAudio.playErrorBuzzer();
-            setFeedbackState('error');
-            setStatusMessage(res.error?.message || `Kartu QR tidak terdaftar: ${trimmedToken}`);
-
-            setTimeout(() => {
-              setFeedbackState('idle');
-            }, 1500);
-          }
+          setTimeout(() => {
+            setFeedbackState('idle');
+          }, 1500);
         }
       } catch (err) {
         attendanceAudio.playErrorBuzzer();
@@ -299,7 +253,7 @@ export default function ClassSessionScannerPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col">
       {/* ===================== HEADER BAR ===================== */}
-      <header className="bg-white border-b border-[#E2E8F0] px-6 py-3.5 sticky top-0 z-20">
+      <header className="bg-white border-b border-[#E2E8F0] px-3 sm:px-6 py-3.5 sticky top-0 z-20">
         <div className="max-w-[1680px] mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -310,17 +264,17 @@ export default function ClassSessionScannerPage() {
               Kembali
             </button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-xs font-semibold text-[#64748B]">SMP NEGERI 1 JABON</span>
-                <span className="text-[#CBD5E1]">|</span>
+                <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                 <h1 className="text-sm font-semibold text-[#0F172A]">
                   Kelas: {session?.class_name || '-'}
                 </h1>
-                <span className="text-[#CBD5E1]">|</span>
+                <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                 <span className="text-xs text-[#64748B]">
                   Mapel: {session?.topic || '-'}
                 </span>
-                <span className="text-[#CBD5E1]">|</span>
+                <span className="text-[#CBD5E1] hidden sm:inline">|</span>
                 <span className="text-xs text-[#64748B]">
                   Guru: {session?.teacher_name || '-'}
                 </span>
@@ -329,7 +283,7 @@ export default function ClassSessionScannerPage() {
           </div>
 
           {/* Status, Countdown, & Tutup Kelas */}
-          <div className="flex items-center gap-4">
+          <div className="w-full sm:w-auto flex flex-wrap items-center gap-2 sm:gap-4">
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-[6px] text-xs font-semibold border ${
                 isSessionOpen
@@ -343,7 +297,7 @@ export default function ClassSessionScannerPage() {
             {isSessionOpen && (
               <div
                 role="timer"
-                className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1 rounded-[6px]"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1 rounded-[6px]"
               >
                 <span className="text-xs text-[#64748B]">Sisa Waktu Hadir:</span>
                 <span
@@ -373,7 +327,7 @@ export default function ClassSessionScannerPage() {
       </header>
 
       {/* ===================== HERO MAIN SPLIT LAYOUT (45:55) ===================== */}
-      <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1680px] w-full mx-auto">
+      <main className="flex-1 p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 max-w-[1680px] w-full mx-auto">
         {/* ================= LEFT (45%) — SCANNER ================= */}
         <section className="lg:col-span-5 flex flex-col gap-5">
           {/* 1. Viewfinder Component */}
@@ -396,7 +350,7 @@ export default function ClassSessionScannerPage() {
             <p className="text-xs text-[#64748B] mb-2 font-medium">Hasil Scan Terakhir</p>
 
             {lastScanResult ? (
-              <div className="flex items-center gap-4 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
+              <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px]">
                 {/* Avatar Siswa Solid */}
                 <div className="w-16 h-16 rounded-[6px] bg-[#2563EB] text-white font-bold text-xl flex items-center justify-center shrink-0">
                   {lastScanResult.full_name
@@ -408,7 +362,7 @@ export default function ClassSessionScannerPage() {
 
                 <div className="flex-1 min-w-0">
                   {/* Nama Siswa: Besar untuk keterbacaan 2 meter */}
-                  <h3 className="text-[24px] font-bold text-[#0F172A] truncate leading-tight tracking-tight">
+                  <h3 className="text-lg sm:text-[24px] font-bold text-[#0F172A] truncate leading-tight tracking-tight">
                     {lastScanResult.full_name}
                   </h3>
                   <p className="text-xs text-[#64748B] mt-1 tabular-nums">
@@ -434,7 +388,7 @@ export default function ClassSessionScannerPage() {
         {/* ================= RIGHT (55%) — ROSTER KELAS ================= */}
         <section className="lg:col-span-7 flex flex-col gap-4">
           {/* Ringkasan Kehadiran Roster */}
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
             <div className="bg-white border border-[#E2E8F0] p-2.5 rounded-[6px] text-center">
               <p className="text-[11px] text-[#64748B]">Total</p>
               <p className="text-lg font-bold text-[#0F172A] tabular-nums">
@@ -518,7 +472,7 @@ export default function ClassSessionScannerPage() {
                 filteredAttendances.map((item, index) => (
                   <div
                     key={item.id || item.student_id || index}
-                    className="p-3 px-4 hover:bg-[#F8FAFC] flex items-center justify-between gap-3 transition-colors"
+                    className="p-3 px-3 sm:px-4 hover:bg-[#F8FAFC] flex items-start justify-between gap-2 sm:gap-3 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xs text-[#64748B] tabular-nums w-5">

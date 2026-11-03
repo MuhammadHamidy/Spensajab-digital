@@ -16,6 +16,61 @@ type MockRepository struct {
 	mock.Mock
 }
 
+func TestOpenSessionRequiresTeacherID(t *testing.T) {
+	mockRepo := new(MockRepository)
+	uc := usecase.NewUseCase(mockRepo)
+
+	session, err := uc.OpenSession(context.Background(), "", domain.OpenSessionRequest{
+		ClassID: "class-7d",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, session)
+	assert.EqualError(t, err, "teacher_id wajib diisi")
+}
+
+func TestCloseSessionRejectsAnotherTeacher(t *testing.T) {
+	mockRepo := new(MockRepository)
+	uc := usecase.NewUseCase(mockRepo)
+	ctx := context.Background()
+	sessionID := "sess-1"
+	ownerID := "teacher-owner"
+
+	mockRepo.On("FindSessionByID", ctx, sessionID).Return(&domain.ClassSession{
+		ID:        sessionID,
+		TeacherID: &ownerID,
+		Status:    domain.SessionStatusOpen,
+	}, nil)
+
+	summary, err := uc.CloseSession(ctx, "teacher-other", sessionID)
+
+	assert.Error(t, err)
+	assert.Nil(t, summary)
+	assert.EqualError(t, err, "guru tidak berwenang menutup sesi ini")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestManualOverrideRejectsClosedSession(t *testing.T) {
+	mockRepo := new(MockRepository)
+	uc := usecase.NewUseCase(mockRepo)
+	ctx := context.Background()
+	sessionID := "sess-1"
+	teacherID := "teacher-owner"
+
+	mockRepo.On("FindSessionByID", ctx, sessionID).Return(&domain.ClassSession{
+		ID:        sessionID,
+		TeacherID: &teacherID,
+		Status:    domain.SessionStatusClosed,
+	}, nil)
+
+	err := uc.ManualOverride(ctx, teacherID, sessionID, "student-1", domain.ManualOverrideRequest{
+		Status: domain.StatusIzin,
+	})
+
+	assert.EqualError(t, err, "sesi kelas sudah ditutup")
+	mockRepo.AssertExpectations(t)
+}
+
 func (m *MockRepository) FindSessionByID(ctx context.Context, sessionID string) (*domain.ClassSession, error) {
 	args := m.Called(ctx, sessionID)
 	if args.Get(0) == nil {
@@ -114,6 +169,11 @@ func (m *MockRepository) GetSessionSummary(ctx context.Context, sessionID string
 func (m *MockRepository) GetLiveOpenSessions(ctx context.Context) ([]*domain.ClassSession, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]*domain.ClassSession), args.Error(1)
+}
+
+func (m *MockRepository) GetAttendanceReport(ctx context.Context, filter domain.AttendanceReportFilter) ([]*domain.AttendanceReportRow, error) {
+	args := m.Called(ctx, filter)
+	return args.Get(0).([]*domain.AttendanceReportRow), args.Error(1)
 }
 
 func (m *MockRepository) FindAllCourses(ctx context.Context) ([]*domain.Course, error) {

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { accountApiAdapter } from '@/lib/features/auth/infrastructure/accountApiAdapter';
+import { API_BASE_URL } from '@/lib/common/config';
 
 export default function StudentsQRManagementPage() {
   const [students, setStudents] = useState([]);
@@ -164,7 +165,7 @@ export default function StudentsQRManagementPage() {
             <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl print:bg-white print:border-none">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`http://localhost:8080/api/school/qrcode/${student.qrToken}?size=160`}
+                src={`${API_BASE_URL}/school/qrcode/${encodeURIComponent(student.qrToken)}?size=160`}
                 alt={`QR ${student.name}`}
                 className="w-32 h-32 object-contain rounded-md"
                 onError={(e) => {

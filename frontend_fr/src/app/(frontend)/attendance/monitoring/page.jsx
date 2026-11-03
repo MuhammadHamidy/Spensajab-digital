@@ -60,7 +60,7 @@ export default function AdminMonitoringPage() {
             {liveSessions.map((ls) => {
               const present = ls.total_present || 0;
               const total = ls.total_students ?? 0;
-              const percent = Math.min(100, Math.round((present / total) * 100));
+              const percent = total > 0 ? Math.min(100, Math.round((present / total) * 100)) : 0;
 
               const now = Date.now();
               const cutoff = ls.late_cutoff_at ? new Date(ls.late_cutoff_at).getTime() : now;

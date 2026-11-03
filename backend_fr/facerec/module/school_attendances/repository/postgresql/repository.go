@@ -272,6 +272,57 @@ func (r *repository) GetSessionSummary(ctx context.Context, sessionID string) (*
 	}, nil
 }
 
+func (r *repository) GetAttendanceReport(ctx context.Context, filter domain.AttendanceReportFilter) ([]*domain.AttendanceReportRow, error) {
+	var rows []*domain.AttendanceReportRow
+	query := r.db.WithContext(ctx).Table("attendances").
+		Select(`
+			accounts.id AS student_id,
+			accounts.nisn,
+			accounts.full_name AS name,
+			LEFT(classes.class_code, 1) AS tingkat,
+			classes.class_code AS class_name,
+			COUNT(attendances.id) AS total_meetings,
+			COUNT(*) FILTER (WHERE attendances.status = ?) AS hadir_count,
+			COUNT(*) FILTER (WHERE attendances.status = ?) AS late_count,
+			COUNT(*) FILTER (WHERE attendances.status = ?) AS sakit_count,
+			COUNT(*) FILTER (WHERE attendances.status = ?) AS izin_count,
+			COUNT(*) FILTER (WHERE attendances.status = ?) AS alpha_count,
+			COALESCE(
+				100.0 * COUNT(*) FILTER (WHERE attendances.status IN (?, ?)) / NULLIF(COUNT(attendances.id), 0),
+				0
+			) AS percentage`,
+			domain.StatusHadir,
+			domain.StatusTerlambat,
+			domain.StatusSakit,
+			domain.StatusIzin,
+			domain.StatusAlpha,
+			domain.StatusHadir,
+			domain.StatusTerlambat,
+		).
+		Joins("JOIN accounts ON accounts.id = attendances.student_id").
+		Joins("JOIN class_sessions ON class_sessions.id = attendances.session_id").
+		Joins("JOIN classes ON classes.id = class_sessions.class_id").
+		Where("class_sessions.date BETWEEN ? AND ?", filter.StartDate, filter.EndDate).
+		Group("accounts.id, accounts.nisn, accounts.full_name, classes.class_code").
+		Order("classes.class_code ASC, accounts.full_name ASC")
+
+	if filter.Tingkat != "" && filter.Tingkat != "ALL" {
+		query = query.Where("LEFT(classes.class_code, 1) = ?", filter.Tingkat)
+	}
+	if filter.ClassID != "" && filter.ClassID != "ALL" {
+		query = query.Where("classes.class_code = ? OR classes.id = ?", filter.ClassID, filter.ClassID)
+	}
+	if filter.Search != "" {
+		search := "%" + filter.Search + "%"
+		query = query.Where("accounts.full_name ILIKE ? OR accounts.nisn ILIKE ?", search, search)
+	}
+
+	if err := query.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 func (r *repository) GetLiveOpenSessions(ctx context.Context) ([]*domain.ClassSession, error) {
 	var list []*domain.ClassSession
 	err := r.db.WithContext(ctx).Table("class_sessions").

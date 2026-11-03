@@ -1,12 +1,15 @@
+import { tokenStorage } from '@/lib/common/tokenStorage';
+
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== 'undefined' ? '/api' : 'http://spensajab-backend:8080/api');
 
 async function fetchJson(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
+  const user = tokenStorage.getUser();
   const headers = {
     'Content-Type': 'application/json',
-    'X-User-Id': 'user-guru-1',
+    ...(user?.id ? { 'X-User-Id': user.id } : {}),
     ...(options.headers || {}),
   };
 
@@ -72,6 +75,11 @@ export const attendanceApi = {
   // Live Monitoring (10 Admin)
   getLiveMonitoring: async () => {
     return fetchJson('/school/monitoring/live');
+  },
+
+  getAttendanceReport: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchJson(`/school/reports/attendance${query ? `?${query}` : ''}`);
   },
 
   // Import Excel

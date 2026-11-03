@@ -1,6 +1,8 @@
 // logout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthContainer } from '@/lib/features/auth/AuthContainer';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +12,7 @@ export async function POST(req: NextRequest) {
     }
     const refreshToken = authHeader.split(' ')[1];
 
+    const { AuthContainer } = await import('@/lib/features/auth/AuthContainer');
     const container = AuthContainer.getInstance();
     await container.logoutUseCase.execute({ refreshToken });
 

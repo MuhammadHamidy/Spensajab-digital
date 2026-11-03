@@ -20,6 +20,9 @@ func NewUseCase(repo domain.Repository) domain.UseCase {
 }
 
 func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.OpenSessionRequest) (*domain.ClassSession, error) {
+	if teacherID == "" {
+		return nil, errors.New("teacher_id wajib diisi")
+	}
 	if req.ClassID == "" {
 		return nil, errors.New("class_id wajib diisi")
 	}
@@ -30,7 +33,10 @@ func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.
 		return nil, err
 	}
 	if existing != nil {
-		return existing, nil // Kembalikan sesi aktif yang sudah ada
+		if existing.TeacherID == nil || *existing.TeacherID != teacherID {
+			return nil, errors.New("kelas sudah memiliki sesi aktif oleh guru lain")
+		}
+		return existing, nil
 	}
 
 	// 2. Siapkan waktu buka & cut-off 15 menit
@@ -72,23 +78,36 @@ func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.
 
 	// 4. Ambil seluruh siswa terdaftar dan inisialisasi kehadiran sebagai PENDING
 	students, err := u.repo.FindStudentsByClass(ctx, req.ClassID)
-	if err == nil && len(students) > 0 {
+	if err != nil {
+		return nil, fmt.Errorf("gagal mengambil siswa kelas: %w", err)
+	}
+	if len(students) > 0 {
 		var studentIDs []string
 		for _, s := range students {
 			studentIDs = append(studentIDs, s.ID)
 		}
-		_ = u.repo.InitializeAttendances(ctx, sessionID, studentIDs)
+		if err := u.repo.InitializeAttendances(ctx, sessionID, studentIDs); err != nil {
+			return nil, fmt.Errorf("gagal menyiapkan presensi siswa: %w", err)
+		}
 		sess.TotalStudents = len(students)
-		_ = u.repo.UpdateSession(ctx, sess)
+		if err := u.repo.UpdateSession(ctx, sess); err != nil {
+			return nil, fmt.Errorf("gagal memperbarui jumlah siswa sesi: %w", err)
+		}
 	}
 
 	return u.repo.FindSessionByID(ctx, sessionID)
 }
 
 func (u *useCase) CloseSession(ctx context.Context, teacherID string, sessionID string) (*domain.SessionSummary, error) {
+	if teacherID == "" {
+		return nil, errors.New("teacher_id wajib diisi")
+	}
 	sess, err := u.repo.FindSessionByID(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("sesi tidak ditemukan: %w", err)
+	}
+	if sess.TeacherID == nil || *sess.TeacherID != teacherID {
+		return nil, errors.New("guru tidak berwenang menutup sesi ini")
 	}
 	if sess.Status == domain.SessionStatusClosed {
 		return u.repo.GetSessionSummary(ctx, sessionID)
@@ -216,6 +235,9 @@ func (u *useCase) ScanQRCode(ctx context.Context, sessionID string, qrToken stri
 }
 
 func (u *useCase) ManualOverride(ctx context.Context, teacherID string, sessionID string, studentID string, req domain.ManualOverrideRequest) error {
+	if teacherID == "" {
+		return errors.New("teacher_id wajib diisi")
+	}
 	if req.Status == "" {
 		return errors.New("status presensi wajib diisi")
 	}
@@ -232,21 +254,32 @@ func (u *useCase) ManualOverride(ctx context.Context, teacherID string, sessionI
 		return fmt.Errorf("status '%s' tidak valid", req.Status)
 	}
 
-	err := u.repo.UpdateAttendanceStatus(ctx, sessionID, studentID, req.Status, req.Notes, &teacherID)
+	sess, err := u.repo.FindSessionByID(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("sesi tidak ditemukan: %w", err)
+	}
+	if sess.TeacherID == nil || *sess.TeacherID != teacherID {
+		return errors.New("guru tidak berwenang mengubah presensi sesi ini")
+	}
+	if sess.Status == domain.SessionStatusClosed {
+		return errors.New("sesi kelas sudah ditutup")
+	}
+
+	err = u.repo.UpdateAttendanceStatus(ctx, sessionID, studentID, req.Status, req.Notes, &teacherID)
 	if err != nil {
 		return err
 	}
 
 	// Update counter summary
-	sess, _ := u.repo.FindSessionByID(ctx, sessionID)
-	if sess != nil {
-		summary, _ := u.repo.GetSessionSummary(ctx, sessionID)
-		if summary != nil {
-			sess.TotalPresent = summary.TotalHadir
-			sess.TotalLate = summary.TotalLate
-			sess.TotalAlpha = summary.TotalAlpha
-			_ = u.repo.UpdateSession(ctx, sess)
-		}
+	summary, err := u.repo.GetSessionSummary(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("gagal menghitung ringkasan sesi: %w", err)
+	}
+	sess.TotalPresent = summary.TotalHadir
+	sess.TotalLate = summary.TotalLate
+	sess.TotalAlpha = summary.TotalAlpha
+	if err := u.repo.UpdateSession(ctx, sess); err != nil {
+		return fmt.Errorf("gagal memperbarui ringkasan sesi: %w", err)
 	}
 
 	return nil
@@ -254,6 +287,16 @@ func (u *useCase) ManualOverride(ctx context.Context, teacherID string, sessionI
 
 func (u *useCase) GetLiveMonitoring(ctx context.Context) ([]*domain.ClassSession, error) {
 	return u.repo.GetLiveOpenSessions(ctx)
+}
+
+func (u *useCase) GetAttendanceReport(ctx context.Context, filter domain.AttendanceReportFilter) ([]*domain.AttendanceReportRow, error) {
+	if filter.StartDate == "" || filter.EndDate == "" {
+		return nil, errors.New("start_date dan end_date wajib diisi")
+	}
+	if filter.StartDate > filter.EndDate {
+		return nil, errors.New("start_date tidak boleh setelah end_date")
+	}
+	return u.repo.GetAttendanceReport(ctx, filter)
 }
 
 func (u *useCase) GenerateQRCodePNG(ctx context.Context, qrToken string, size int) ([]byte, error) {

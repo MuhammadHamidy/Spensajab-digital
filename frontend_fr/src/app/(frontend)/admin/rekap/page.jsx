@@ -1,152 +1,107 @@
 'use client';
 
-import React, { useState } from 'react';
-import Button from '@/components/Button';
-
-const SAMPLE_REKAP_DATA = [
-  {
-    studentId: 'user-siswa-1',
-    nisn: '0081293812',
-    name: 'Andi Saputra',
-    tingkat: '7',
-    className: '7A',
-    hadirCount: 14,
-    lateCount: 1,
-    sakitCount: 1,
-    izinCount: 0,
-    alphaCount: 0,
-    totalMeetings: 16,
-    percentage: 93.7,
-  },
-  {
-    studentId: 'user-siswa-2',
-    nisn: '0081293813',
-    name: 'Budi Kurniawan',
-    tingkat: '8',
-    className: '8A',
-    hadirCount: 15,
-    lateCount: 0,
-    sakitCount: 0,
-    izinCount: 1,
-    alphaCount: 0,
-    totalMeetings: 16,
-    percentage: 93.7,
-  },
-  {
-    studentId: 'user-siswa-3',
-    nisn: '0081293814',
-    name: 'Citra Dewi',
-    tingkat: '9',
-    className: '9A',
-    hadirCount: 16,
-    lateCount: 0,
-    sakitCount: 0,
-    izinCount: 0,
-    alphaCount: 0,
-    totalMeetings: 16,
-    percentage: 100.0,
-  },
-  {
-    studentId: 'user-siswa-4',
-    nisn: '0081293815',
-    name: 'Dimas Arya Pratama',
-    tingkat: '7',
-    className: '7B',
-    hadirCount: 12,
-    lateCount: 2,
-    sakitCount: 1,
-    izinCount: 0,
-    alphaCount: 1,
-    totalMeetings: 16,
-    percentage: 87.5,
-  },
-  {
-    studentId: 'user-siswa-5',
-    nisn: '0081293816',
-    name: 'Aisyah Putri Azzahra',
-    tingkat: '8',
-    className: '8B',
-    hadirCount: 15,
-    lateCount: 1,
-    sakitCount: 0,
-    izinCount: 0,
-    alphaCount: 0,
-    totalMeetings: 16,
-    percentage: 100.0,
-  },
-  {
-    studentId: 'user-siswa-6',
-    nisn: '0081293817',
-    name: 'Fajar Ramadhan',
-    tingkat: '9',
-    className: '9B',
-    hadirCount: 13,
-    lateCount: 1,
-    sakitCount: 0,
-    izinCount: 2,
-    alphaCount: 0,
-    totalMeetings: 16,
-    percentage: 87.5,
-  },
-];
+import React, { useEffect, useMemo, useState } from 'react';
+import { attendanceApi } from '@/lib/attendanceApi';
+import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
 export default function AttendanceRekapPage() {
-  const [filterTingkat, setFilterTingkat] = useState('ALL'); // 'ALL' | '7' | '8' | '9'
-  const [filterKelas, setFilterKelas] = useState('ALL'); // 'ALL' | '7A' | '7B' | '8A' | '8B' | '9A' | '9B'
-  const [startDate, setStartDate] = useState('2026-09-01');
-  const [endDate, setEndDate] = useState('2026-09-30');
+  const today = new Date();
+  const formatDate = (date) => date.toISOString().slice(0, 10);
+  const [filterTingkat, setFilterTingkat] = useState('ALL');
+  const [filterKelas, setFilterKelas] = useState('ALL');
+  const [startDate, setStartDate] = useState(formatDate(new Date(today.getFullYear(), today.getMonth(), 1)));
+  const [endDate, setEndDate] = useState(formatDate(today));
   const [search, setSearch] = useState('');
+  const [classes, setClasses] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Saring opsi kelas berdasarkan tingkat yang dipilih
-  const availableClasses = {
-    ALL: ['7A', '7B', '8A', '8B', '9A', '9B'],
-    '7': ['7A', '7B'],
-    '8': ['8A', '8B'],
-    '9': ['9A', '9B'],
-  }[filterTingkat];
+  useEffect(() => {
+    classApiAdapter.getAll().then(setClasses).catch((err) => setError(err.message));
+  }, []);
 
-  const filtered = SAMPLE_REKAP_DATA.filter((item) => {
-    const matchTingkat = filterTingkat === 'ALL' || item.tingkat === filterTingkat;
-    const matchKelas = filterKelas === 'ALL' || item.className === filterKelas;
-    const matchSearch =
-      !search ||
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.nisn.includes(search);
-    return matchTingkat && matchKelas && matchSearch;
-  });
-
-  const handleExportExcel = () => {
-    const query = new URLSearchParams({
-      tingkat: filterTingkat,
-      class_id: filterKelas,
+  useEffect(() => {
+    let active = true;
+    setIsLoading(true);
+    setError('');
+    attendanceApi.getAttendanceReport({
       start_date: startDate,
       end_date: endDate,
-    }).toString();
-    window.open(`http://localhost:8080/api/admin/reports/attendance/export?${query}`, '_blank');
+      tingkat: filterTingkat,
+      class_id: filterKelas,
+      search,
+    }).then((res) => {
+      if (!active) return;
+      if (res.success && Array.isArray(res.data)) {
+        setRows(res.data);
+      } else {
+        setRows([]);
+        setError(res.error?.message || 'Rekap presensi gagal dimuat');
+      }
+    }).catch((err) => {
+      if (active) {
+        setRows([]);
+        setError(err.message || 'Rekap presensi gagal dimuat');
+      }
+    }).finally(() => {
+      if (active) setIsLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [startDate, endDate, filterTingkat, filterKelas, search]);
+
+  const availableClasses = useMemo(() => classes
+    .filter((item) => filterTingkat === 'ALL' || String(item.class_code || '').startsWith(filterTingkat))
+    .map((item) => item.class_code)
+    .filter(Boolean), [classes, filterTingkat]);
+
+  const handleExportExcel = () => {
+    const header = ['NISN', 'Nama', 'Kelas', 'Total Sesi', 'Hadir', 'Telat', 'Sakit', 'Izin', 'Alpha', 'Persentase'];
+    const lines = rows.map((item) => [
+      item.nisn,
+      item.name,
+      item.class_name,
+      item.total_meetings,
+      item.hadir_count,
+      item.late_count,
+      item.sakit_count,
+      item.izin_count,
+      item.alpha_count,
+      `${item.percentage}%`,
+    ].map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','));
+    const blob = new Blob([[header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rekap-presensi-${startDate}-${endDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Rekapitulasi Presensi Siswa
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Laporan akumulasi kehadiran siswa tingkat 7, 8, dan 9 dengan opsi ekspor ke Microsoft Excel (.xlsx).
+            Laporan akumulasi kehadiran siswa berdasarkan data session dan presensi dari server.
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleExportExcel}
-          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto justify-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <span>Export Rekap ke Excel (.xlsx)</span>
+          <span>Unduh Rekap (.csv)</span>
         </button>
       </div>
 
@@ -246,32 +201,38 @@ export default function AttendanceRekapPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((item) => (
-                <tr key={item.studentId} className="hover:bg-slate-50/70 transition-colors">
+              {isLoading ? (
+                <tr><td colSpan="10" className="py-8 text-center text-slate-500">Memuat rekap presensi...</td></tr>
+              ) : error ? (
+                <tr><td colSpan="10" className="py-8 text-center text-rose-600" role="alert">{error}</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan="10" className="py-8 text-center text-slate-500">Tidak ada data presensi pada filter ini.</td></tr>
+              ) : rows.map((item) => (
+                <tr key={item.student_id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3 px-4 tabular-nums font-mono text-slate-500">{item.nisn}</td>
                   <td className="py-3 px-4 font-bold text-slate-900">{item.name}</td>
                   <td className="py-3 px-3 text-center">
                     <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                      {item.className}
+                      {item.class_name}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums text-slate-600 font-medium">
-                    {item.totalMeetings}
+                    {item.total_meetings}
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums font-bold text-emerald-700">
-                    {item.hadirCount}
+                    {item.hadir_count}
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-medium">
-                    {item.lateCount}
+                    {item.late_count}
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums text-blue-700 font-medium">
-                    {item.sakitCount}
+                    {item.sakit_count}
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums text-indigo-700 font-medium">
-                    {item.izinCount}
+                    {item.izin_count}
                   </td>
                   <td className="py-3 px-3 text-center tabular-nums font-bold text-rose-700">
-                    {item.alphaCount}
+                    {item.alpha_count}
                   </td>
                   <td className="py-3 px-4 text-right tabular-nums">
                     <span

@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_class_sessions_one_open_per_class;

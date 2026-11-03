@@ -27,6 +27,7 @@ type Repository interface {
 	SaveAttendance(ctx context.Context, attendance *Attendance) error
 	UpdateAttendanceStatus(ctx context.Context, sessionID string, studentID string, status string, notes string, editedBy *string) error
 	GetSessionSummary(ctx context.Context, sessionID string) (*SessionSummary, error)
+	GetAttendanceReport(ctx context.Context, filter AttendanceReportFilter) ([]*AttendanceReportRow, error)
 
 	// Monitoring
 	GetLiveOpenSessions(ctx context.Context) ([]*ClassSession, error)

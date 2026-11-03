@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { attendanceApi } from '@/lib/attendanceApi';
+import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
 export default function AttendanceDashboardPage() {
   const router = useRouter();
@@ -13,7 +14,10 @@ export default function AttendanceDashboardPage() {
 
   // Modal Buka Kelas Baru
   const [isOpenModalActive, setIsOpenModalActive] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState('class-7a');
+  const [classes, setClasses] = useState([]);
+  const [isClassesLoading, setIsClassesLoading] = useState(true);
+  const [classesError, setClassesError] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [topic, setTopic] = useState('');
   const [sessionNumber, setSessionNumber] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,12 +33,32 @@ export default function AttendanceDashboardPage() {
     setIsLoading(false);
   };
 
+  const fetchClasses = async () => {
+    setIsClassesLoading(true);
+    setClassesError('');
+    try {
+      const classList = await classApiAdapter.getAll();
+      setClasses(classList);
+      setSelectedClassId((current) => current || classList[0]?.id || '');
+    } catch (error) {
+      setClasses([]);
+      setClassesError(error.message || 'Daftar kelas gagal dimuat');
+    } finally {
+      setIsClassesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchSessions();
+    fetchClasses();
   }, []);
 
   const handleOpenClass = async (e) => {
     e.preventDefault();
+    if (!selectedClassId) {
+      setClassesError('Pilih kelas yang akan dibuka terlebih dahulu');
+      return;
+    }
     setIsSubmitting(true);
 
     const res = await attendanceApi.openSession(selectedClassId, topic, sessionNumber);
@@ -52,9 +76,9 @@ export default function AttendanceDashboardPage() {
   const closedSessions = sessions.filter((s) => s.status === 'CLOSED');
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-        <div className="border-b border-[#E2E8F0] pb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="border-b border-[#E2E8F0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl font-semibold text-[#0F172A]">
               Dashboard Presensi & Jadwal Kelas
@@ -67,7 +91,8 @@ export default function AttendanceDashboardPage() {
           <Button
             variant="primary"
             size="md"
-            onClick={() => setIsOpenModalActive(true)}
+          className="w-full sm:w-auto"
+          onClick={() => setIsOpenModalActive(true)}
           >
             Buka Sesi Baru
           </Button>
@@ -98,7 +123,7 @@ export default function AttendanceDashboardPage() {
                     </div>
 
                     <span className="text-xs text-[#64748B] tabular-nums">
-                      {s.start_time || '07:30'} WIB
+                      {s.start_time || '-'} WIB
                     </span>
                   </div>
 
@@ -226,14 +251,24 @@ export default function AttendanceDashboardPage() {
             <select
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
+              disabled={isClassesLoading || classes.length === 0}
               className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
             >
-              {SAMPLE_CLASSES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} — {c.subject}
+              {isClassesLoading && <option value="">Memuat daftar kelas...</option>}
+              {!isClassesLoading && classes.length === 0 && (
+                <option value="">Belum ada kelas yang diampu</option>
+              )}
+              {classes.map((classItem) => (
+                <option key={classItem.id} value={classItem.id}>
+                  {classItem.class_code} — {classItem.course_name || 'Mata pelajaran belum ditentukan'}
                 </option>
               ))}
             </select>
+            {classesError && (
+              <p className="mt-1 text-xs text-[#BE123C]" role="alert">
+                {classesError}
+              </p>
+            )}
           </div>
 
           <div>

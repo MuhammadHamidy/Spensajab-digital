@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseLogin } from '@/lib/features/auth/presentation/dto/LoginRequestDto';
-import { AuthContainer } from '@/lib/features/auth/AuthContainer';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +10,7 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parseLogin(body);
 
+    const { AuthContainer } = await import('@/lib/features/auth/AuthContainer');
     const container = AuthContainer.getInstance();
     const result = await container.loginUseCase.execute({ email, password });
 

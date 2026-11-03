@@ -1,104 +1,13 @@
 import { httpClient } from '@/lib/common/httpClient';
 
-const MALE_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%231A3D63"/><circle cx="50" cy="38" r="20" fill="%23B3CFE5"/><path d="M20,85 C20,62 33,55 50,55 C67,55 80,62 80,85 Z" fill="%23B3CFE5"/></svg>`;
-const FEMALE_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%234A7FA7"/><circle cx="50" cy="38" r="18" fill="%23F6FAFD"/><path d="M15,85 C15,60 30,52 50,52 C70,52 85,60 85,85 Z" fill="%23F6FAFD"/></svg>`;
-
-const DEFAULT_TEACHERS = [
-  {
-    id: 'tch-01',
-    full_name: 'Dra. Siti Aminah, M.Pd',
-    nim_nip: '198203152008012004',
-    username: 'guru_aminah',
-    email: 'aminah@smpn1jabon.sch.id',
-    phone: '081234567891',
-    photo_url: FEMALE_AVATAR,
-    course_ids: ['crs-inf', 'crs-ipa'],
-    course_names: ['Informatika & Komputer', 'IPA (Ilmu Pengetahuan Alam)'],
-    class_ids: ['class-7a', 'class-7b'],
-    class_codes: ['VII-A', 'VII-B'],
-  },
-  {
-    id: 'tch-02',
-    full_name: 'Budi Santoso, S.Pd',
-    nim_nip: '198503122010121001',
-    username: 'guru_budi',
-    email: 'budi@smpn1jabon.sch.id',
-    phone: '081234567892',
-    photo_url: MALE_AVATAR,
-    course_ids: ['crs-mtk'],
-    course_names: ['Matematika Terpadu'],
-    class_ids: ['class-8a'],
-    class_codes: ['VIII-A'],
-  },
-];
-
-const DEFAULT_STUDENTS = [
-  {
-    id: 'std-01',
-    full_name: 'Ahmad Rizky Pratama',
-    nisn: '0081234567',
-    parent_phone: '0812987654321',
-    address: 'SMP Negeri 1 Jabon',
-    photo_url: MALE_AVATAR,
-    has_face: true,
-  },
-  {
-    id: 'std-02',
-    full_name: 'Siti Nurhaliza',
-    nisn: '0081234568',
-    parent_phone: '0812987654322',
-    address: 'Krian, Sidoarjo',
-    photo_url: FEMALE_AVATAR,
-    has_face: true,
-  },
-];
-
-function getLocalStudents() {
-  if (typeof window === 'undefined') return DEFAULT_STUDENTS;
-  try {
-    const data = localStorage.getItem('perpusdig_local_students');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {}
-  return DEFAULT_STUDENTS;
-}
-
-function saveLocalStudents(students) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('perpusdig_local_students', JSON.stringify(students));
-  } catch (e) {}
-}
-
-function getLocalTeachers() {
-  if (typeof window === 'undefined') return DEFAULT_TEACHERS;
-  try {
-    const data = localStorage.getItem('perpusdig_local_teachers');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {}
-  return DEFAULT_TEACHERS;
-}
-
-function saveLocalTeachers(teachers) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('perpusdig_local_teachers', JSON.stringify(teachers));
-  } catch (e) {}
-}
-
 export const accountApiAdapter = {
   getAll: async (role = '') => {
     try {
       const query = role ? `?role=${encodeURIComponent(role)}` : '';
       const res = await httpClient.get(`/accounts${query}`);
       return res.data || [];
-    } catch {
-      return role === 'GURU' ? getLocalTeachers() : getLocalStudents();
+    } catch (error) {
+      throw new Error(error.message || 'Data akun tidak dapat dimuat dari backend');
     }
   },
 

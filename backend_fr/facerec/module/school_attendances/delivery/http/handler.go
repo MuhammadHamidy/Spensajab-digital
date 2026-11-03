@@ -32,6 +32,7 @@ func (h *SchoolAttendanceHandler) RegisterRoutes(app *fiber.App) {
 
 	// Monitoring Live & Tools
 	api.Get("/monitoring/live", h.GetLiveMonitoring)
+	api.Get("/reports/attendance", h.GetAttendanceReport)
 	api.Get("/qrcode/:token", h.GetQRCodeImage)
 
 	// Kelola Mata Pelajaran (1 Admin)
@@ -50,11 +51,8 @@ func (h *SchoolAttendanceHandler) OpenSession(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(responses.Fail("BAD_REQUEST", err.Error()))
 	}
 
-	// Ambil teacher_id dari query/header jika ada, atau default guru
-	teacherID := c.Query("teacher_id", "")
-	if teacherID == "" {
-		teacherID = c.Get("X-User-Id", "user-guru-1")
-	}
+	// Identitas guru harus berasal dari request yang sudah diautentikasi.
+	teacherID := c.Get("X-User-Id", "")
 
 	sess, err := h.useCase.OpenSession(c.Context(), teacherID, req)
 	if err != nil {
@@ -86,7 +84,7 @@ func (h *SchoolAttendanceHandler) GetSessionDetail(c *fiber.Ctx) error {
 }
 
 func (h *SchoolAttendanceHandler) GetSessions(c *fiber.Ctx) error {
-	teacherID := c.Query("teacher_id", "")
+	teacherID := c.Get("X-User-Id", "")
 	classID := c.Query("class_id", "")
 	status := c.Query("status", "")
 
@@ -115,7 +113,7 @@ func (h *SchoolAttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 func (h *SchoolAttendanceHandler) ManualOverride(c *fiber.Ctx) error {
 	sessionID := c.Params("id")
 	studentID := c.Params("student_id")
-	teacherID := c.Get("X-User-Id", "user-guru-1")
+	teacherID := c.Get("X-User-Id", "")
 
 	var req domain.ManualOverrideRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -135,6 +133,21 @@ func (h *SchoolAttendanceHandler) GetLiveMonitoring(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(responses.Fail("MONITORING_ERROR", err.Error()))
 	}
 	return c.Status(http.StatusOK).JSON(responses.Success(list, "Data monitoring kelas aktif berhasil dimuat"))
+}
+
+func (h *SchoolAttendanceHandler) GetAttendanceReport(c *fiber.Ctx) error {
+	filter := domain.AttendanceReportFilter{
+		StartDate: c.Query("start_date"),
+		EndDate:   c.Query("end_date"),
+		Tingkat:   c.Query("tingkat"),
+		ClassID:   c.Query("class_id"),
+		Search:    c.Query("search"),
+	}
+	rows, err := h.useCase.GetAttendanceReport(c.Context(), filter)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responses.Fail("REPORT_ERROR", err.Error()))
+	}
+	return c.Status(http.StatusOK).JSON(responses.Success(rows, "Rekap presensi berhasil dimuat"))
 }
 
 func (h *SchoolAttendanceHandler) GetQRCodeImage(c *fiber.Ctx) error {

@@ -116,6 +116,29 @@ type SessionSummary struct {
 	TotalPending  int `json:"total_pending"`
 }
 
+type AttendanceReportFilter struct {
+	StartDate string
+	EndDate   string
+	Tingkat   string
+	ClassID   string
+	Search    string
+}
+
+type AttendanceReportRow struct {
+	StudentID     string  `json:"student_id"`
+	NISN          string  `json:"nisn"`
+	Name          string  `json:"name"`
+	Tingkat       string  `json:"tingkat"`
+	ClassName     string  `json:"class_name"`
+	TotalMeetings int     `json:"total_meetings"`
+	HadirCount    int     `json:"hadir_count"`
+	LateCount     int     `json:"late_count"`
+	SakitCount    int     `json:"sakit_count"`
+	IzinCount     int     `json:"izin_count"`
+	AlphaCount    int     `json:"alpha_count"`
+	Percentage    float64 `json:"percentage"`
+}
+
 type SessionDetailResponse struct {
 	Session     *ClassSession  `json:"session"`
 	Summary     SessionSummary `json:"summary"`

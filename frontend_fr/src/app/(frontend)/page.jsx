@@ -545,7 +545,7 @@ export default function MainPage() {
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5 tabular-nums">
-                    Guru: <strong className="text-slate-700">{item.teacher_name}</strong> • Tanggal: {item.date || '2026-09-20'}
+                    Guru: <strong className="text-slate-700">{item.teacher_name || '-'}</strong> • Tanggal: {item.date || '-'}
                   </p>
                 </div>
               </div>
@@ -553,10 +553,10 @@ export default function MainPage() {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <span className="text-xs font-bold text-[#15803D] tabular-nums block">
-                    {item.total_present || 32} Siswa Hadir
+                    {item.total_present ?? 0} Siswa Hadir
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    dari {item.total_students || 34} siswa
+                    dari {item.total_students ?? 0} siswa
                   </span>
                 </div>
                 <Link
