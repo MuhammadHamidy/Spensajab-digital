@@ -54,6 +54,7 @@ export default function AttendanceRekapPage() {
   const [editSessionNumber, setEditSessionNumber] = useState(1);
   const [editDate, setEditDate] = useState('');
   const [editStatus, setEditStatus] = useState('OPEN');
+  const [editLateMinutes, setEditLateMinutes] = useState(30);
   const [isSavingSession, setIsSavingSession] = useState(false);
 
   const applyPeriodPreset = (preset) => {
@@ -211,18 +212,22 @@ export default function AttendanceRekapPage() {
     setEditSessionNumber(sess.session_number || 1);
     setEditDate(String(sess.date || '').slice(0, 10) || todayStr);
     setEditStatus(sess.status || 'OPEN');
+    setEditLateMinutes(attendanceApi.resolveSessionLateMinutes(sess));
   };
 
   const handleSaveEditSession = async (e) => {
     if (e) e.preventDefault();
     if (!editingSession) return;
     setIsSavingSession(true);
+    const parsedLate = Math.max(0, Number(editLateMinutes) || 0);
+    attendanceApi.setDefaultLateMinutes(parsedLate);
     const res = await attendanceApi.editSession(editingSession.id, {
       class_id: editingSession.class_id,
       topic: editTopic,
       session_number: Number(editSessionNumber) || 1,
       date: editDate,
       status: editStatus,
+      late_threshold_minutes: parsedLate,
     });
     setIsSavingSession(false);
     if (res.success) {
@@ -695,6 +700,25 @@ export default function AttendanceRekapPage() {
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
                   required
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1">
+                Batas Waktu Keterlambatan (Menit)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="240"
+                  value={editLateMinutes}
+                  onChange={(e) => setEditLateMinutes(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-28 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 tabular-nums"
+                />
+                <span className="text-[11px] text-slate-500">
+                  menit (0 = Tanpa Batas Terlambat)
+                </span>
               </div>
             </div>
 

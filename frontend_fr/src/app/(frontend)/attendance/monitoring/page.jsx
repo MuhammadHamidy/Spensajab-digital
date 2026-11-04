@@ -80,9 +80,10 @@ export default function AdminMonitoringPage() {
               const percent = total > 0 ? Math.min(100, Math.round((present / total) * 100)) : 0;
 
               const now = Date.now();
-              const cutoff = ls.late_cutoff_at ? new Date(ls.late_cutoff_at).getTime() : now;
+              const hasCutoff = Boolean(ls.late_cutoff_at);
+              const cutoff = hasCutoff ? new Date(ls.late_cutoff_at).getTime() : now;
               const diff = cutoff - now;
-              const isPast15m = diff <= 0;
+              const isPastCutoff = hasCutoff && diff <= 0;
               const mins = Math.max(0, Math.floor(diff / 60000));
               const secs = Math.max(0, Math.floor((diff % 60000) / 1000));
 
@@ -98,12 +99,16 @@ export default function AdminMonitoringPage() {
                       </span>
                       <span
                         className={`text-xs font-semibold px-2 py-0.5 rounded-[4px] border tabular-nums ${
-                          isPast15m
+                          isPastCutoff
                             ? 'bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]'
                             : 'bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]'
                         }`}
                       >
-                        {isPast15m ? 'Lewat Batas Waktu' : `Sisa: ${mins}m ${secs}s`}
+                        {!hasCutoff
+                          ? 'Tanpa Batas Terlambat'
+                          : isPastCutoff
+                          ? 'Lewat Batas Waktu'
+                          : `Sisa: ${mins}m ${secs}s`}
                       </span>
                     </div>
 

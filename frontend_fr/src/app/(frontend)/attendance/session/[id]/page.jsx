@@ -10,6 +10,16 @@ import { attendanceApi } from '@/lib/attendanceApi';
 import { attendanceAudio } from '@/lib/attendanceAudio';
 import { useAuth } from '@/lib/features/auth/presentation/useAuth';
 
+const LATE_PRESETS = [
+  { label: '10 Menit', value: 10 },
+  { label: '15 Menit', value: 15 },
+  { label: '20 Menit', value: 20 },
+  { label: '30 Menit', value: 30 },
+  { label: '45 Menit', value: 45 },
+  { label: '60 Menit', value: 60 },
+  { label: 'Tanpa Batas', value: 0 },
+];
+
 export default function ClassSessionScannerPage() {
   const params = useParams();
   const sessionId = params.id;
@@ -36,8 +46,8 @@ export default function ClassSessionScannerPage() {
   const [feedbackState, setFeedbackState] = useState('idle'); // 'idle' | 'success' | 'error'
   const [statusMessage, setStatusMessage] = useState('');
 
-  // Timer 15 Menit
-  const [remainingTime, setRemainingTime] = useState('15:00');
+  // Timer Keterlambatan Dinamis
+  const [remainingTime, setRemainingTime] = useState('--:--');
   const [isCutoffPassed, setIsCutoffPassed] = useState(false);
 
   // Filter & Search Roster
@@ -54,6 +64,7 @@ export default function ClassSessionScannerPage() {
   const [editSessionNumber, setEditSessionNumber] = useState(1);
   const [editDate, setEditDate] = useState('');
   const [editStatus, setEditStatus] = useState('OPEN');
+  const [editLateMinutes, setEditLateMinutes] = useState(30);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [selectedStudentForOverride, setSelectedStudentForOverride] = useState(null);
   const [overrideStatus, setOverrideStatus] = useState('SAKIT');
@@ -83,18 +94,19 @@ export default function ClassSessionScannerPage() {
     return () => clearInterval(interval);
   }, [fetchSessionData]);
 
-  // 2. Countdown Timer 15 Menit
+  // 2. Countdown Timer Keterlambatan Sesi
   useEffect(() => {
     if (!session || session.status !== 'OPEN') return;
 
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const cutoffTime = session.late_cutoff_at
-        ? new Date(session.late_cutoff_at).getTime()
-        : session.opened_at
-        ? new Date(session.opened_at).getTime() + 15 * 60 * 1000
-        : now;
+    const updateTimer = () => {
+      if (!session.late_cutoff_at) {
+        setRemainingTime('Tanpa Batas');
+        setIsCutoffPassed(false);
+        return;
+      }
 
+      const now = new Date().getTime();
+      const cutoffTime = new Date(session.late_cutoff_at).getTime();
       const diff = cutoffTime - now;
 
       if (diff <= 0) {
@@ -108,7 +120,10 @@ export default function ClassSessionScannerPage() {
         );
         setIsCutoffPassed(false);
       }
-    }, 1000);
+    };
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
 
     return () => clearInterval(timer);
   }, [session]);
@@ -221,18 +236,22 @@ export default function ClassSessionScannerPage() {
     setEditSessionNumber(session.session_number || 1);
     setEditDate(String(session.date || '').slice(0, 10));
     setEditStatus(session.status || 'OPEN');
+    setEditLateMinutes(attendanceApi.resolveSessionLateMinutes(session));
     setIsEditSessionModalOpen(true);
   };
 
   const handleSaveEditSession = async (e) => {
     if (e) e.preventDefault();
     setIsSubmitting(true);
+    const parsedLate = Math.max(0, Number(editLateMinutes) || 0);
+    attendanceApi.setDefaultLateMinutes(parsedLate);
     const res = await attendanceApi.editSession(sessionId, {
       class_id: session?.class_id,
       topic: editTopic,
       session_number: Number(editSessionNumber) || 1,
       date: editDate,
       status: editStatus,
+      late_threshold_minutes: parsedLate,
     });
     setIsSubmitting(false);
     if (res.success) {
@@ -380,22 +399,33 @@ export default function ClassSessionScannerPage() {
             </span>
 
             {isSessionOpen && (
-              <div
+              <button
+                type="button"
+                onClick={handleOpenEditSessionModal}
+                title="Klik untuk mengatur batas waktu keterlambatan"
                 role="timer"
-                className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1 rounded-[6px]"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] px-3 py-1 rounded-[6px] cursor-pointer transition-colors"
               >
                 <span className="text-xs text-[#64748B]">Sisa Waktu Hadir:</span>
                 <span
                   className={`text-base font-bold tabular-nums ${
-                    isCutoffPassed ? 'text-[#BE123C]' : 'text-[#B45309]'
+                    !session?.late_cutoff_at
+                      ? 'text-[#047857]'
+                      : isCutoffPassed
+                      ? 'text-[#BE123C]'
+                      : 'text-[#B45309]'
                   }`}
                 >
                   {remainingTime}
                 </span>
                 <span className="text-[11px] text-[#94A3B8]">
-                  {isCutoffPassed ? '(Terlambat)' : '(dari 15 menit)'}
+                  {!session?.late_cutoff_at
+                    ? '(Atur Batas)'
+                    : isCutoffPassed
+                    ? `(Lewat ${attendanceApi.resolveSessionLateMinutes(session)} menit)`
+                    : `(dari ${attendanceApi.resolveSessionLateMinutes(session)} menit)`}
                 </span>
-              </div>
+              </button>
             )}
 
             {isSessionOpen && (
@@ -726,6 +756,41 @@ export default function ClassSessionScannerPage() {
                 className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] tabular-nums"
                 required
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[#0F172A]">
+              Batas Waktu Keterlambatan (Menit)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {LATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => setEditLateMinutes(preset.value)}
+                  className={`px-2 py-1 rounded-[6px] text-[11px] font-semibold border cursor-pointer ${
+                    Number(editLateMinutes) === preset.value
+                      ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                      : 'bg-white border-[#CBD5E1] text-[#475569] hover:bg-[#F1F5F9]'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="240"
+                value={editLateMinutes}
+                onChange={(e) => setEditLateMinutes(Math.max(0, Number(e.target.value) || 0))}
+                className="w-24 bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs font-semibold text-[#0F172A] tabular-nums"
+              />
+              <span className="text-[11px] text-[#64748B]">
+                menit (isi <strong>0</strong> untuk Tanpa Batas Terlambat)
+              </span>
             </div>
           </div>
 

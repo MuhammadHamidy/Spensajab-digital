@@ -9,6 +9,15 @@ import { attendanceApi } from '@/lib/attendanceApi';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
 const DAYS_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const LATE_PRESETS = [
+  { label: '10 Menit', value: 10 },
+  { label: '15 Menit', value: 15 },
+  { label: '20 Menit', value: 20 },
+  { label: '30 Menit', value: 30 },
+  { label: '45 Menit', value: 45 },
+  { label: '60 Menit', value: 60 },
+  { label: 'Tanpa Batas', value: 0 },
+];
 
 function formatScheduleTime(item) {
   if (!item) return '';
@@ -40,6 +49,7 @@ export default function AttendanceDashboardPage() {
   const [editSessionNumber, setEditSessionNumber] = useState(1);
   const [editDate, setEditDate] = useState('');
   const [editStatus, setEditStatus] = useState('OPEN');
+  const [editLateMinutes, setEditLateMinutes] = useState(30);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Modal Buka Kelas Baru
@@ -50,6 +60,7 @@ export default function AttendanceDashboardPage() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [topic, setTopic] = useState('');
   const [sessionNumber, setSessionNumber] = useState(1);
+  const [lateThresholdMinutes, setLateThresholdMinutes] = useState(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchSessions = async () => {
@@ -108,6 +119,7 @@ export default function AttendanceDashboardPage() {
   };
 
   useEffect(() => {
+    setLateThresholdMinutes(attendanceApi.getDefaultLateMinutes(30));
     fetchSessions();
     fetchClasses();
   }, []);
@@ -163,7 +175,8 @@ export default function AttendanceDashboardPage() {
       selectedClassId,
       finalTopic,
       sessionNumber,
-      mappedTeacherId
+      mappedTeacherId,
+      lateThresholdMinutes
     );
     setIsSubmitting(false);
 
@@ -184,18 +197,23 @@ export default function AttendanceDashboardPage() {
     setEditSessionNumber(sess.session_number || 1);
     setEditDate(String(sess.date || '').slice(0, 10));
     setEditStatus(sess.status || 'OPEN');
+    setEditLateMinutes(attendanceApi.resolveSessionLateMinutes(sess));
   };
 
   const handleSaveEditSession = async (e) => {
     if (e) e.preventDefault();
     if (!editingSession) return;
     setIsSavingEdit(true);
+    const parsedLate = Math.max(0, Number(editLateMinutes) || 0);
+    attendanceApi.setDefaultLateMinutes(parsedLate);
+    setLateThresholdMinutes(parsedLate);
     const res = await attendanceApi.editSession(editingSession.id, {
       class_id: editingSession.class_id,
       topic: editTopic,
       session_number: Number(editSessionNumber) || 1,
       date: editDate,
       status: editStatus,
+      late_threshold_minutes: parsedLate,
     });
     setIsSavingEdit(false);
     if (res.success) {
@@ -295,6 +313,55 @@ export default function AttendanceDashboardPage() {
           >
             + Buka Sesi Presensi
           </Button>
+        </div>
+      </div>
+
+      {/* Pengaturan Cepat Batas Waktu Keterlambatan */}
+      <div className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span className="text-xs font-bold text-[#0F172A] block">
+            Pengaturan Batas Waktu Keterlambatan Sesi
+          </span>
+          <span className="text-[11px] text-[#64748B]">
+            {Number(lateThresholdMinutes) === 0
+              ? 'Mode Tanpa Batas Terlambat: seluruh siswa yang scan selama sesi terbuka dicatat Hadir.'
+              : `Batas toleransi saat ini: ${lateThresholdMinutes} menit sejak sesi kelas dibuka.`}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {LATE_PRESETS.map((preset) => (
+            <button
+              key={preset.value}
+              type="button"
+              onClick={() => {
+                setLateThresholdMinutes(preset.value);
+                attendanceApi.setDefaultLateMinutes(preset.value);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                Number(lateThresholdMinutes) === preset.value
+                  ? 'bg-[#2563EB] text-white'
+                  : 'bg-[#F8FAFC] border border-[#CBD5E1] text-[#475569] hover:bg-[#F1F5F9]'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+          <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg px-2 py-0.5">
+            <input
+              type="number"
+              min="0"
+              max="240"
+              value={lateThresholdMinutes}
+              onChange={(e) => {
+                const val = Math.max(0, Number(e.target.value) || 0);
+                setLateThresholdMinutes(val);
+                attendanceApi.setDefaultLateMinutes(val);
+              }}
+              className="w-12 bg-transparent text-xs font-bold text-[#0F172A] text-center focus:outline-none tabular-nums"
+            />
+            <span className="text-[11px] text-[#64748B]">menit</span>
+          </div>
         </div>
       </div>
 
@@ -776,8 +843,52 @@ export default function AttendanceDashboardPage() {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-[#0F172A]">
+              Batas Waktu Keterlambatan (Menit)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {LATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => {
+                    setLateThresholdMinutes(preset.value);
+                    attendanceApi.setDefaultLateMinutes(preset.value);
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors cursor-pointer ${
+                    Number(lateThresholdMinutes) === preset.value
+                      ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                      : 'bg-white border-[#CBD5E1] text-[#475569] hover:bg-[#F1F5F9]'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="240"
+                value={lateThresholdMinutes}
+                onChange={(e) => {
+                  const val = Math.max(0, Number(e.target.value) || 0);
+                  setLateThresholdMinutes(val);
+                  attendanceApi.setDefaultLateMinutes(val);
+                }}
+                className="w-28 bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-xs font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] tabular-nums"
+              />
+              <span className="text-xs text-[#64748B]">
+                menit (isi <strong>0</strong> jika tidak ingin ada batas terlambat)
+              </span>
+            </div>
+          </div>
+
           <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-2.5 rounded-lg text-xs text-[#64748B]">
-            Toleransi waktu hadir tepat waktu adalah 15 menit dari sesi dibuka. Siswa yang memindai kartu setelah 15 menit akan ditandai sebagai Terlambat.
+            {Number(lateThresholdMinutes) === 0
+              ? 'Mode Tanpa Batas Terlambat aktif: Siswa yang memindai kartu QR kapan saja selama sesi kelas dibuka akan dicatat Hadir.'
+              : `Toleransi waktu hadir tepat waktu adalah ${lateThresholdMinutes} menit dari sesi dibuka. Siswa yang memindai kartu setelah ${lateThresholdMinutes} menit akan ditandai sebagai Terlambat.`}
           </div>
         </form>
       </Modal>
@@ -849,6 +960,41 @@ export default function AttendanceDashboardPage() {
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 tabular-nums"
                   required
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-800">
+                Batas Waktu Keterlambatan (Menit)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {LATE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setEditLateMinutes(preset.value)}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold border cursor-pointer ${
+                      Number(editLateMinutes) === preset.value
+                        ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="240"
+                  value={editLateMinutes}
+                  onChange={(e) => setEditLateMinutes(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-24 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 tabular-nums"
+                />
+                <span className="text-[11px] text-slate-500">
+                  menit (0 = Tanpa Batas Terlambat)
+                </span>
               </div>
             </div>
 

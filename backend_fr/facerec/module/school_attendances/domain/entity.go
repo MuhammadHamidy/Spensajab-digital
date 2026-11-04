@@ -1,6 +1,11 @@
 package domain
 
-import "time"
+import (
+	"math"
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Status Presensi Siswa
 const (
@@ -45,15 +50,35 @@ type ClassSession struct {
 	EndTime       string     `json:"end_time" gorm:"type:varchar(10)"`
 	Status        string     `json:"status" gorm:"type:varchar(20);not null;default:'UPCOMING'"`
 	SessionToken  string     `json:"session_token" gorm:"type:varchar(100)"`
-	OpenedAt      *time.Time `json:"opened_at"`
-	LateCutoffAt  *time.Time `json:"late_cutoff_at"`
-	ClosedAt      *time.Time `json:"closed_at"`
-	TotalStudents int        `json:"total_students" gorm:"default:0"`
-	TotalPresent  int        `json:"total_present" gorm:"default:0"`
-	TotalLate     int        `json:"total_late" gorm:"default:0"`
-	TotalAlpha    int        `json:"total_alpha" gorm:"default:0"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	OpenedAt             *time.Time `json:"opened_at"`
+	LateCutoffAt         *time.Time `json:"late_cutoff_at"`
+	LateThresholdMinutes int        `json:"late_threshold_minutes" gorm:"->"`
+	ClosedAt             *time.Time `json:"closed_at"`
+	TotalStudents        int        `json:"total_students" gorm:"default:0"`
+	TotalPresent         int        `json:"total_present" gorm:"default:0"`
+	TotalLate            int        `json:"total_late" gorm:"default:0"`
+	TotalAlpha           int        `json:"total_alpha" gorm:"default:0"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+func (s *ClassSession) ComputeLateThresholdMinutes() int {
+	if s == nil || s.LateCutoffAt == nil {
+		return 0
+	}
+	if s.OpenedAt != nil {
+		mins := int(math.Round(s.LateCutoffAt.Sub(*s.OpenedAt).Minutes()))
+		if mins < 1 {
+			return 1
+		}
+		return mins
+	}
+	return 15
+}
+
+func (s *ClassSession) AfterFind(tx *gorm.DB) error {
+	s.LateThresholdMinutes = s.ComputeLateThresholdMinutes()
+	return nil
 }
 
 func (ClassSession) TableName() string {
@@ -97,17 +122,19 @@ type StudentProfile struct {
 
 // DTOs
 type OpenSessionRequest struct {
-	ClassID       string `json:"class_id"`
-	Topic         string `json:"topic"`
-	SessionNumber int    `json:"session_number"`
+	ClassID              string `json:"class_id"`
+	Topic                string `json:"topic"`
+	SessionNumber        int    `json:"session_number"`
+	LateThresholdMinutes *int   `json:"late_threshold_minutes"`
 }
 
 type UpdateSessionRequest struct {
-	ClassID       string `json:"class_id"`
-	Topic         string `json:"topic"`
-	SessionNumber int    `json:"session_number"`
-	Date          string `json:"date"`
-	Status        string `json:"status"`
+	ClassID              string `json:"class_id"`
+	Topic                string `json:"topic"`
+	SessionNumber        int    `json:"session_number"`
+	Date                 string `json:"date"`
+	Status               string `json:"status"`
+	LateThresholdMinutes *int   `json:"late_threshold_minutes"`
 }
 
 type ScanQRRequest struct {

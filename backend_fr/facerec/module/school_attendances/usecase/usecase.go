@@ -36,9 +36,16 @@ func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.
 		return existing, nil
 	}
 
-	// 2. Siapkan waktu buka & cut-off 15 menit
+	// 2. Siapkan waktu buka & batas waktu keterlambatan yang dapat diatur (fleksibel)
 	now := time.Now()
-	cutoff := now.Add(15 * time.Minute)
+	var cutoffPtr *time.Time
+	if req.LateThresholdMinutes == nil {
+		cutoff := now.Add(15 * time.Minute)
+		cutoffPtr = &cutoff
+	} else if *req.LateThresholdMinutes > 0 {
+		cutoff := now.Add(time.Duration(*req.LateThresholdMinutes) * time.Minute)
+		cutoffPtr = &cutoff
+	}
 	todayStr := now.Format("2006-01-02")
 	timeStr := now.Format("15:04")
 
@@ -63,7 +70,7 @@ func (u *useCase) OpenSession(ctx context.Context, teacherID string, req domain.
 		Status:        domain.SessionStatusOpen,
 		SessionToken:  uuid.New().String(),
 		OpenedAt:      &now,
-		LateCutoffAt:  &cutoff,
+		LateCutoffAt:  cutoffPtr,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -136,17 +143,42 @@ func (u *useCase) EditSession(ctx context.Context, sessionID string, req domain.
 	}
 
 	now := time.Now()
+	reopened := false
 	if req.Status != "" && req.Status != sess.Status {
 		if req.Status == domain.SessionStatusOpen {
 			sess.Status = domain.SessionStatusOpen
 			sess.ClosedAt = nil
-			cutoff := now.Add(15 * time.Minute)
-			sess.LateCutoffAt = &cutoff
+			sess.OpenedAt = &now
+			reopened = true
+			if req.LateThresholdMinutes == nil {
+				prevMins := sess.ComputeLateThresholdMinutes()
+				if prevMins > 0 {
+					cutoff := now.Add(time.Duration(prevMins) * time.Minute)
+					sess.LateCutoffAt = &cutoff
+				} else {
+					sess.LateCutoffAt = nil
+				}
+			}
 		} else if req.Status == domain.SessionStatusClosed {
 			if _, err := u.repo.CloseSessionAndMarkAlpha(ctx, sessionID); err != nil {
 				return nil, err
 			}
 			sess.Status = domain.SessionStatusClosed
+		}
+	}
+
+	if req.LateThresholdMinutes != nil {
+		if *req.LateThresholdMinutes <= 0 {
+			sess.LateCutoffAt = nil
+		} else {
+			baseTime := now
+			if !reopened && sess.OpenedAt != nil && now.Sub(*sess.OpenedAt) <= 3*time.Hour {
+				baseTime = *sess.OpenedAt
+			} else {
+				sess.OpenedAt = &now
+			}
+			cutoff := baseTime.Add(time.Duration(*req.LateThresholdMinutes) * time.Minute)
+			sess.LateCutoffAt = &cutoff
 		}
 	}
 
@@ -245,7 +277,7 @@ func (u *useCase) ScanQRCode(ctx context.Context, sessionID string, qrToken stri
 		return nil, fmt.Errorf("siswa %s sudah diabsen sebelumnya pada %s", student.FullName, formattedTime)
 	}
 
-	// 5. Evaluasi status berdasarkan batas cut-off 15 menit
+	// 5. Evaluasi status berdasarkan batas cut-off keterlambatan sesi
 	status := domain.StatusHadir
 	isLate := false
 	msg := fmt.Sprintf("Presensi BERHASIL dicatat: %s", student.FullName)
@@ -253,7 +285,11 @@ func (u *useCase) ScanQRCode(ctx context.Context, sessionID string, qrToken stri
 	if sess.LateCutoffAt != nil && now.After(*sess.LateCutoffAt) {
 		status = domain.StatusTerlambat
 		isLate = true
-		msg = fmt.Sprintf("Presensi dicatat TERLAMBAT (lewat batas 15 menit): %s", student.FullName)
+		lateMins := sess.ComputeLateThresholdMinutes()
+		if lateMins <= 0 {
+			lateMins = 15
+		}
+		msg = fmt.Sprintf("Presensi dicatat TERLAMBAT (lewat batas %d menit): %s", lateMins, student.FullName)
 	}
 
 	// 6. Simpan / Perbarui kehadiran

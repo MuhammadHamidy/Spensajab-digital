@@ -677,7 +677,7 @@ export default function MainPage() {
               Monitoring Kelas
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Pantau seluruh ruang kelas yang sedang berlangsung secara real-time dengan batas 15 menit.
+              Pantau seluruh ruang kelas yang sedang berlangsung secara real-time beserta batas waktu keterlambatan yang dapat diatur.
             </p>
           </Link>
 

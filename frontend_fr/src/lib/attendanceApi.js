@@ -26,9 +26,52 @@ async function fetchJson(endpoint, options = {}) {
   }
 }
 
+const LATE_MINUTES_STORAGE_KEY = 'spensajab_default_late_minutes';
+
+export function getSavedLateMinutes(fallback = 30) {
+  if (typeof window === 'undefined') return fallback;
+  const raw = window.localStorage.getItem(LATE_MINUTES_STORAGE_KEY);
+  if (raw === null || raw === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+export function saveDefaultLateMinutes(minutes) {
+  if (typeof window === 'undefined') return;
+  const parsed = Number(minutes);
+  if (Number.isFinite(parsed) && parsed >= 0) {
+    window.localStorage.setItem(LATE_MINUTES_STORAGE_KEY, String(Math.round(parsed)));
+  }
+}
+
+export function resolveSessionLateMinutes(session) {
+  if (!session) return getSavedLateMinutes(30);
+  if (!session.late_cutoff_at) return 0; // 0 = Tanpa Batas Keterlambatan
+  if (typeof session.late_threshold_minutes === 'number' && session.late_threshold_minutes > 0) {
+    return session.late_threshold_minutes;
+  }
+  if (session.opened_at && session.late_cutoff_at) {
+    const diffMins = Math.round(
+      (new Date(session.late_cutoff_at).getTime() - new Date(session.opened_at).getTime()) / 60000
+    );
+    return diffMins > 0 ? diffMins : 1;
+  }
+  return getSavedLateMinutes(30);
+}
+
 export const attendanceApi = {
+  getDefaultLateMinutes: getSavedLateMinutes,
+  setDefaultLateMinutes: saveDefaultLateMinutes,
+  resolveSessionLateMinutes,
+
   // Sesi Kelas
-  openSession: async (classId, topic, sessionNumber, teacherId = '') => {
+  openSession: async (classId, topic, sessionNumber, teacherId = '', lateThresholdMinutes = undefined) => {
+    const resolvedLateMinutes =
+      lateThresholdMinutes !== undefined && lateThresholdMinutes !== null && lateThresholdMinutes !== ''
+        ? Number(lateThresholdMinutes)
+        : getSavedLateMinutes(30);
+    saveDefaultLateMinutes(resolvedLateMinutes);
+
     return fetchJson('/school/sessions/open', {
       method: 'POST',
       headers: teacherId ? { 'X-User-Id': teacherId } : undefined,
@@ -36,6 +79,7 @@ export const attendanceApi = {
         class_id: classId,
         topic: topic || 'Pembelajaran Tatap Muka',
         session_number: Number(sessionNumber) || 1,
+        late_threshold_minutes: resolvedLateMinutes,
       }),
     });
   },

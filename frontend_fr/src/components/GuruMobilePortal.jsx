@@ -11,6 +11,15 @@ import { attendanceAudio } from '@/lib/attendanceAudio';
 import { classApiAdapter } from '@/lib/features/classes/infrastructure/classApiAdapter';
 
 const DAYS_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const LATE_PRESETS = [
+  { label: '10 mnt', value: 10 },
+  { label: '15 mnt', value: 15 },
+  { label: '20 mnt', value: 20 },
+  { label: '30 mnt', value: 30 },
+  { label: '45 mnt', value: 45 },
+  { label: '60 mnt', value: 60 },
+  { label: 'Tanpa Batas', value: 0 },
+];
 
 function classScheduleTime(item) {
   if (item.schedule_start_time || item.schedule_end_time) {
@@ -39,8 +48,8 @@ export default function GuruMobilePortal({ user, onLogout }) {
     total_pending: 0,
   });
 
-  // Timer 15 Menit
-  const [remainingTime, setRemainingTime] = useState('15:00');
+  // Timer Keterlambatan Dinamis
+  const [remainingTime, setRemainingTime] = useState('--:--');
   const [isCutoffPassed, setIsCutoffPassed] = useState(false);
 
   // Scan Feedback
@@ -57,6 +66,10 @@ export default function GuruMobilePortal({ user, onLogout }) {
   const scanSuccessTimerRef = useRef(null);
   const [isOpenClassModalOpen, setIsOpenClassModalOpen] = useState(false);
   const [isCloseClassModalOpen, setIsCloseClassModalOpen] = useState(false);
+  const [isEditSessionModalOpen, setIsEditSessionModalOpen] = useState(false);
+  const [editSessionTopic, setEditSessionTopic] = useState('');
+  const [editSessionNumber, setEditSessionNumber] = useState(1);
+  const [editSessionLateMinutes, setEditSessionLateMinutes] = useState(30);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [selectedStudentForOverride, setSelectedStudentForOverride] = useState(null);
   const [overrideStatus, setOverrideStatus] = useState('SAKIT');
@@ -69,6 +82,7 @@ export default function GuruMobilePortal({ user, onLogout }) {
   const [newClassId, setNewClassId] = useState('');
   const [newSessionNumber, setNewSessionNumber] = useState(1);
   const [newTopic, setNewTopic] = useState('');
+  const [newLateMinutes, setNewLateMinutes] = useState(30);
   const [openClassError, setOpenClassError] = useState('');
 
   // Filter & Search Absensi
@@ -135,6 +149,7 @@ export default function GuruMobilePortal({ user, onLogout }) {
   }, [user?.id, user?.fullName, user?.full_name, user?.name]);
 
   useEffect(() => {
+    setNewLateMinutes(attendanceApi.getDefaultLateMinutes(30));
     fetchAssignedClasses().catch(() => setAssignedClasses([]));
   }, [fetchAssignedClasses]);
 
@@ -278,18 +293,19 @@ export default function GuruMobilePortal({ user, onLogout }) {
     }
   }, [selectedSessionId, fetchSelectedSessionDetail, sessions]);
 
-  // 3. Countdown Timer 15 Menit Sesi Aktif
+  // 3. Countdown Timer Keterlambatan Sesi Aktif
   useEffect(() => {
     if (!activeSession || activeSession.status !== 'OPEN') return;
 
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const cutoffTime = activeSession.late_cutoff_at
-        ? new Date(activeSession.late_cutoff_at).getTime()
-        : activeSession.opened_at
-        ? new Date(activeSession.opened_at).getTime() + 15 * 60 * 1000
-        : now;
+    const updateTimer = () => {
+      if (!activeSession.late_cutoff_at) {
+        setRemainingTime('Tanpa Batas');
+        setIsCutoffPassed(false);
+        return;
+      }
 
+      const now = new Date().getTime();
+      const cutoffTime = new Date(activeSession.late_cutoff_at).getTime();
       const diff = cutoffTime - now;
 
       if (diff <= 0) {
@@ -303,7 +319,10 @@ export default function GuruMobilePortal({ user, onLogout }) {
         );
         setIsCutoffPassed(false);
       }
-    }, 1000);
+    };
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
 
     return () => clearInterval(timer);
   }, [activeSession]);
@@ -403,7 +422,8 @@ export default function GuruMobilePortal({ user, onLogout }) {
       newClassId,
       newTopic || cls.course_name || cls.course_code || 'Materi Pembelajaran',
       newSessionNumber,
-      user?.id
+      user?.id,
+      newLateMinutes
     );
     setIsSubmitting(false);
 
@@ -511,6 +531,48 @@ export default function GuruMobilePortal({ user, onLogout }) {
       await fetchSessionsList();
     } else {
       alert(res.error?.message || res.message || 'Gagal menghapus sesi kelas');
+    }
+  };
+
+  const handleOpenEditSessionModal = (sessObj = null) => {
+    const targetSess =
+      sessObj ||
+      sessionDetail ||
+      sessions.find((s) => String(s.id) === String(selectedSessionId)) ||
+      activeSession;
+    if (!targetSess) return;
+    setEditSessionTopic(targetSess.topic || '');
+    setEditSessionNumber(targetSess.session_number || 1);
+    setEditSessionLateMinutes(attendanceApi.resolveSessionLateMinutes(targetSess));
+    setIsEditSessionModalOpen(true);
+  };
+
+  const handleSaveEditSession = async (e) => {
+    if (e) e.preventDefault();
+    const targetSess =
+      sessionDetail ||
+      sessions.find((s) => String(s.id) === String(selectedSessionId)) ||
+      activeSession;
+    if (!targetSess?.id) return;
+    setIsSubmitting(true);
+    const parsedLate = Math.max(0, Number(editSessionLateMinutes) || 0);
+    attendanceApi.setDefaultLateMinutes(parsedLate);
+    setNewLateMinutes(parsedLate);
+    const res = await attendanceApi.editSession(targetSess.id, {
+      class_id: targetSess.class_id,
+      topic: editSessionTopic,
+      session_number: Number(editSessionNumber) || 1,
+      date: String(targetSess.date || '').slice(0, 10),
+      status: targetSess.status || 'OPEN',
+      late_threshold_minutes: parsedLate,
+    });
+    setIsSubmitting(false);
+    if (res.success !== false) {
+      setIsEditSessionModalOpen(false);
+      await fetchSessionsList();
+      await fetchSelectedSessionDetail(targetSess.id);
+    } else {
+      alert(res.error?.message || res.message || 'Gagal memperbarui pengaturan sesi');
     }
   };
 
@@ -816,18 +878,50 @@ export default function GuruMobilePortal({ user, onLogout }) {
               </div>
             </div>
 
-            {/* Petunjuk Toleransi 15 Menit */}
+            {/* Petunjuk Toleransi Keterlambatan Dinamis */}
             <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-[6px] text-xs text-[#64748B] space-y-1">
-              <span className="font-semibold text-[#0F172A] block">Ketentuan Presensi:</span>
-              <p>
-                1. Siswa yang memindai QR dalam 15 menit pertama tercatat sebagai <strong>Hadir</strong>.
-              </p>
-              <p>
-                2. Setelah 15 menit, siswa tercatat sebagai <strong>Terlambat</strong>.
-              </p>
-              <p>
-                3. Saat kelas ditutup, siswa yang belum memindai otomatis menjadi <strong>Alpha</strong>.
-              </p>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#0F172A] block">Ketentuan Presensi:</span>
+                {activeSession && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditSessionModal(activeSession)}
+                    className="text-[11px] font-semibold text-[#2563EB] hover:underline cursor-pointer"
+                  >
+                    Atur Batas Terlambat →
+                  </button>
+                )}
+              </div>
+              {(() => {
+                const currentLateMins = activeSession
+                  ? attendanceApi.resolveSessionLateMinutes(activeSession)
+                  : Number(newLateMinutes) || 0;
+                if (currentLateMins <= 0) {
+                  return (
+                    <>
+                      <p>
+                        1. Sesi diatur <strong>Tanpa Batas Waktu Terlambat</strong>: Siswa yang memindai QR selama kelas dibuka tercatat sebagai <strong>Hadir</strong>.
+                      </p>
+                      <p>
+                        2. Saat kelas ditutup, siswa yang belum memindai otomatis menjadi <strong>Alpha</strong>.
+                      </p>
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <p>
+                      1. Siswa yang memindai QR dalam <strong>{currentLateMins} menit pertama</strong> tercatat sebagai <strong>Hadir</strong>.
+                    </p>
+                    <p>
+                      2. Setelah <strong>{currentLateMins} menit</strong>, siswa tercatat sebagai <strong>Terlambat</strong>.
+                    </p>
+                    <p>
+                      3. Saat kelas ditutup, siswa yang belum memindai otomatis menjadi <strong>Alpha</strong>.
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1071,19 +1165,29 @@ export default function GuruMobilePortal({ user, onLogout }) {
 
             {/* Pemilih Kelas & Sesi */}
             <div className="bg-white border border-[#E2E8F0] p-3 rounded-[10px] space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <label className="block text-xs font-semibold text-[#0F172A]">
                   Pilih Sesi Kelas yang Ingin Dikelola:
                 </label>
                 {selectedSessionId && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteSelectedSession}
-                    disabled={isSubmitting}
-                    className="px-2.5 py-1 rounded-[6px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold cursor-pointer"
-                  >
-                    Hapus Sesi Ini
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditSessionModal()}
+                      disabled={isSubmitting}
+                      className="px-2.5 py-1 rounded-[6px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-semibold cursor-pointer"
+                    >
+                      Atur Keterlambatan / Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelectedSession}
+                      disabled={isSubmitting}
+                      className="px-2.5 py-1 rounded-[6px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold cursor-pointer"
+                    >
+                      Hapus Sesi Ini
+                    </button>
+                  </div>
                 )}
               </div>
               <select
@@ -1351,8 +1455,145 @@ export default function GuruMobilePortal({ user, onLogout }) {
             />
           </div>
 
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[#0F172A]">
+              Batas Waktu Keterlambatan (Menit)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {LATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => {
+                    setNewLateMinutes(preset.value);
+                    attendanceApi.setDefaultLateMinutes(preset.value);
+                  }}
+                  className={`px-2 py-1 rounded-[6px] text-[11px] font-semibold border cursor-pointer ${
+                    Number(newLateMinutes) === preset.value
+                      ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                      : 'bg-white border-[#CBD5E1] text-[#475569]'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="240"
+                value={newLateMinutes}
+                onChange={(e) => {
+                  const val = Math.max(0, Number(e.target.value) || 0);
+                  setNewLateMinutes(val);
+                  attendanceApi.setDefaultLateMinutes(val);
+                }}
+                className="w-24 bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs font-semibold text-[#0F172A] tabular-nums"
+              />
+              <span className="text-[11px] text-[#64748B]">
+                menit (isi <strong>0</strong> = Tanpa Batas Terlambat)
+              </span>
+            </div>
+          </div>
+
           <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-2.5 rounded-[6px] text-xs text-[#64748B]">
-            Batas waktu presensi tepat waktu adalah 15 menit sejak kelas dibuka.
+            {Number(newLateMinutes) === 0
+              ? 'Mode Tanpa Batas Terlambat: Siswa yang memindai QR selama kelas dibuka dicatat Hadir.'
+              : `Batas waktu presensi tepat waktu adalah ${newLateMinutes} menit sejak kelas dibuka.`}
+          </div>
+        </form>
+      </Modal>
+
+      {/* ===================== MODAL ATUR KETERLAMBATAN / EDIT SESI ===================== */}
+      <Modal
+        isOpen={isEditSessionModalOpen}
+        onClose={() => setIsEditSessionModalOpen(false)}
+        title="Atur Batas Keterlambatan & Sesi"
+        footerActions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsEditSessionModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSubmitting}
+              onClick={handleSaveEditSession}
+            >
+              Simpan Perubahan
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveEditSession} className="space-y-3 text-xs">
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              Materi Pelajaran / Topik Sesi
+            </label>
+            <input
+              type="text"
+              value={editSessionTopic}
+              onChange={(e) => setEditSessionTopic(e.target.value)}
+              className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1">
+              Pertemuan Ke-
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="36"
+              value={editSessionNumber}
+              onChange={(e) => setEditSessionNumber(e.target.value)}
+              className="w-full bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs text-[#0F172A] tabular-nums"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[#0F172A]">
+              Batas Waktu Keterlambatan (Menit)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {LATE_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => setEditSessionLateMinutes(preset.value)}
+                  className={`px-2 py-1 rounded-[6px] text-[11px] font-semibold border cursor-pointer ${
+                    Number(editSessionLateMinutes) === preset.value
+                      ? 'bg-[#2563EB] border-[#2563EB] text-white'
+                      : 'bg-white border-[#CBD5E1] text-[#475569]'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="240"
+                value={editSessionLateMinutes}
+                onChange={(e) =>
+                  setEditSessionLateMinutes(Math.max(0, Number(e.target.value) || 0))
+                }
+                className="w-24 bg-white border border-[#CBD5E1] rounded-[6px] px-3 py-1.5 text-xs font-semibold text-[#0F172A] tabular-nums"
+              />
+              <span className="text-[11px] text-[#64748B]">
+                menit (0 = Tanpa Batas Terlambat)
+              </span>
+            </div>
           </div>
         </form>
       </Modal>
